@@ -19,6 +19,8 @@ cp -R dist <app>/src/vendor/universal-rsvp-reader
 node scripts/verify-copy.mjs <app>/src/vendor/universal-rsvp-reader   # doit afficher 0 erreur
 ```
 
+Autre possibilité : téléchargez l'archive `universal-rsvp-reader-<version>.zip` de la [release GitHub](https://github.com/docvinum/RSVP_ORP/releases) et décompressez-la au même endroit.
+
 L'import se fait toujours via le fichier `.js`, dont le `.d.ts` voisin fournit les types :
 
 ```ts

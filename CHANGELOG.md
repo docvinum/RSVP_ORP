@@ -2,11 +2,6 @@
 
 Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Versionnage : [SemVer](https://semver.org/lang/fr/).
 
-## [Non publié]
-
-### Ajouté
-- Documentation pour agents IA de coding : `AGENTS.md` (contribution au dépôt), `CLAUDE.md`, `docs/ai-integration.md` (intégration dans une application hôte) et `llms.txt`.
-
 ## [1.0.0] — 2026-10-26
 
 Première version.
@@ -24,5 +19,7 @@ Première version.
 - Build ESM autonome avec déclarations TypeScript et manifeste d'empreintes ; script de vérification de copie.
 - Démonstrateurs JavaScript natif, Vue 3 et Angular 22.
 - Tests Vitest (unitaires), Playwright (desktop, mobile, intégration, accessibilité axe, régression visuelle) et CI GitHub Actions.
+- Documentation pour agents IA de coding : `AGENTS.md` (contribution au dépôt), `CLAUDE.md`, `docs/ai-integration.md` (intégration dans une application hôte) et `llms.txt`.
+- Workflow de publication (`.github/workflows/release.yml`) : vérifications, build reproductible, archives `.zip`/`.tar.gz` de `dist/` et empreintes SHA-256 jointes à la release.
 
 [1.0.0]: https://github.com/docvinum/RSVP_ORP/releases/tag/v1.0.0

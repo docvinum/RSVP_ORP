@@ -116,6 +116,13 @@ Modifiez `onKeyDown` dans `src/ui/reader-element.ts`. Respectez les garde-fous (
 
 Relancez `npm run test:e2e`, puis `npm run test:visual`. Si le changement visuel est voulu, regénérez les captures avec `npm run test:visual:update`, puis **regardez les PNG** de `tests/e2e/visual/__screenshots__/` avant de les commiter. Vérifiez l'accessibilité avec `tests/e2e/reader/a11y.spec.ts` (axe-core, WCAG 2.2 AA).
 
+### Publier une version
+
+1. Sur une branche : incrémentez `version` dans `package.json` (SemVer), renommez la section « Non publié » du `CHANGELOG.md` en `## [x.y.z] — AAAA-MM-JJ` et ajoutez le lien en bas du fichier. Lancez `npm run build` et commitez `dist/` (la bannière et le manifeste portent la version).
+2. Vérifiez les notes : `node scripts/release-notes.mjs x.y.z`.
+3. Après fusion dans `main`, déclenchez le workflow **Release** (`workflow_dispatch`, entrée `version` = `x.y.z`). Poussez un tag `vx.y.z` si vous préférez ce déclencheur. Le workflow vérifie la version, rejoue les contrôles, contrôle que `dist/` est à jour, puis crée le tag, la release, les archives `.zip`/`.tar.gz` et `SHA256SUMS.txt`.
+4. Ne recréez jamais une release existante : le workflow échoue si le tag a déjà une release.
+
 ## 7. Définition de « terminé »
 
 Avant de proposer un commit ou une PR :
