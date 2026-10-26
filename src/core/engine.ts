@@ -82,6 +82,11 @@ const defaultTimer: Timer = {
 /**
  * Moteur RSVP indépendant du DOM. Une instance par lecteur.
  *
+ * Réentrance : l'état (index, statut, minuterie) est entièrement mis à jour
+ * avant toute notification. Un abonné peut donc appeler n'importe quelle
+ * méthode (pause, seek, destroy…) depuis un événement sans laisser de
+ * minuterie orpheline ni d'état incohérent.
+ *
  * Planification : chaque mot a une échéance `affichage + durée`. Les mots
  * suivants sont planifiés à partir de l'échéance précédente (compensation de
  * dérive). Si la minuterie se réveille avec plus de `maxLagMs` de retard, la
@@ -132,7 +137,11 @@ export class RsvpEngine {
 
   // ───────────────────────── document ─────────────────────────
 
-  /** Charge un document ; la lecture est en pause (`ready`) au mot `startIndex`. */
+  /**
+   * Charge un document ; la lecture est en pause (`ready`) au mot
+   * `startIndex`, tronqué et borné comme pour `seek()` (une valeur non finie
+   * vaut 0).
+   */
   load(doc: NormalizedDocument, startIndex = 0): void {
     if (this.destroyed) return;
     this.stopTimer();
@@ -144,9 +153,9 @@ export class RsvpEngine {
       this.setStatus('idle');
       return;
     }
-    this.index = this.clampIndex(startIndex);
+    this.index = this.clampIndex(Number.isFinite(startIndex) ? Math.trunc(startIndex) : 0);
     this.setStatus('ready');
-    this.emitPosition();
+    if (this.doc === doc && !this.destroyed) this.emitPosition();
   }
 
   unload(): void {
@@ -169,12 +178,13 @@ export class RsvpEngine {
   /** Démarre ou reprend. Depuis `complete`, recommence au début. Sans effet si déjà en lecture. */
   play(): void {
     if (!this.doc || this.status === 'idle' || this.status === 'playing') return;
-    if (this.status === 'complete') {
+    const restart = this.status === 'complete';
+    if (restart) {
       this.index = 0;
       this.resetRamp();
-      this.emitPosition();
     }
     this.startPlaying();
+    if (restart && this.doc && !this.destroyed) this.emitPosition();
   }
 
   /** Reprend depuis `paused` ou `ready` uniquement. */
@@ -207,8 +217,8 @@ export class RsvpEngine {
     if (this.status === 'playing') {
       this.stopTimer();
       this.index = target;
-      this.emitPosition();
       this.showCurrent(this.clock.now());
+      this.emitPosition();
       return;
     }
     this.index = target;
@@ -338,6 +348,11 @@ export class RsvpEngine {
 
   // ───────────────────────── interne ─────────────────────────
 
+  /** Statut relu après une notification (non rétréci par TypeScript). */
+  private currentStatus(): EngineStatus {
+    return this.status;
+  }
+
   private clampIndex(i: number): number {
     const total = this.doc?.words.length ?? 0;
     return Math.min(Math.max(0, i), Math.max(0, total - 1));
@@ -355,9 +370,13 @@ export class RsvpEngine {
   }
 
   private startPlaying(): void {
-    this.rampSegmentStart = this.clock.now();
-    this.setStatus('playing');
-    this.showCurrent(this.rampSegmentStart);
+    const now = this.clock.now();
+    const previous = this.status;
+    this.rampSegmentStart = now;
+    this.status = 'playing';
+    // Minuterie armée avant la notification : un abonné qui met en pause la désarme.
+    this.showCurrent(now);
+    if (previous !== 'playing') this.events.emit('status', { status: 'playing', previous });
   }
 
   /** Affiche le mot courant à l'instant `shownAt` et planifie le suivant. */
@@ -369,6 +388,7 @@ export class RsvpEngine {
 
   private arm(): void {
     this.stopTimer();
+    if (this.destroyed || this.status !== 'playing' || !this.doc) return;
     const delay = Math.max(0, this.deadline - this.clock.now());
     this.handle = this.timer.set(() => this.tick(), delay);
   }
@@ -381,9 +401,11 @@ export class RsvpEngine {
     if (this.index >= this.doc.words.length - 1) {
       this.accumulateRamp();
       this.setStatus('complete');
+      // Un abonné a pu relancer, repositionner ou détruire le moteur.
+      if (this.currentStatus() !== 'complete' || !this.doc) return;
       const snap = this.getSnapshot();
       this.events.emit('position', snap);
-      this.events.emit('complete', snap);
+      if (this.currentStatus() === 'complete' && this.doc) this.events.emit('complete', snap);
       return;
     }
     let shownAt = this.deadline;
@@ -393,9 +415,10 @@ export class RsvpEngine {
       shownAt = now;
     }
     this.index++;
-    this.emitPosition();
-    this.updateRampCompletion();
+    const rampFinished = this.updateRampCompletion();
     this.showCurrent(shownAt);
+    this.emitPosition();
+    if (rampFinished && !this.destroyed) this.events.emit('speed', { speed: this.manualSpeed, source: 'acceleration' });
   }
 
   /** Replanifie le mot courant après un changement de vitesse ou de timing. */
@@ -431,11 +454,13 @@ export class RsvpEngine {
     }
   }
 
-  private updateRampCompletion(): void {
+  /** Termine la montée si sa durée est écoulée ; retourne vrai si elle vient de se terminer. */
+  private updateRampCompletion(): boolean {
     if (this.rampActive && this.rampElapsedNow() >= this.config.acceleration.duration * 1000) {
       this.rampActive = false;
       this.manualSpeed = this.config.acceleration.targetSpeed;
-      this.events.emit('speed', { speed: this.manualSpeed, source: 'acceleration' });
+      return true;
     }
+    return false;
   }
 }

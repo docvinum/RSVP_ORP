@@ -1,6 +1,6 @@
 import { Emitter, type Listener, type Unsubscribe } from '../core/emitter';
 import { RsvpEngine, type Clock, type EngineSnapshot, type EngineStatus, type PauseReason, type Timer } from '../core/engine';
-import { ReaderError } from '../core/errors';
+import { ReaderError, type ReaderErrorCode } from '../core/errors';
 import type { NormalizedDocument } from '../core/model';
 import {
   applySettingsPatch,
@@ -90,7 +90,7 @@ export interface ReaderPosition {
 }
 
 export type ReaderStatus = 'closed' | 'ready' | 'playing' | 'paused' | 'complete' | 'destroyed';
-export type CloseReason = 'user' | 'api' | 'superseded' | 'destroy' | 'detached';
+export type CloseReason = 'user' | 'api' | 'superseded' | 'destroy' | 'detached' | 'error';
 export type SettingsChangeSource = 'user' | 'api' | 'preferences';
 
 export interface ReaderState {
@@ -163,6 +163,10 @@ function toPosition(s: EngineSnapshot): ReaderPosition | null {
   return { index: s.index, total: s.total, progress: s.progress, sentenceIndex: s.sentenceIndex, blockIndex: s.blockIndex, speed: s.speed };
 }
 
+function asReaderError(error: unknown, code: ReaderErrorCode, message: string): ReaderError {
+  return error instanceof ReaderError ? error : new ReaderError(code, message, { cause: error });
+}
+
 function deepActiveElement(doc: Document): HTMLElement | null {
   let active: Element | null = doc.activeElement;
   while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
@@ -178,7 +182,12 @@ class ReaderImpl implements Reader {
   private storage: StorageLike | null = null;
   private readonly storageKey: string;
   private element: ReaderElement | null = null;
-  private open_ = false;
+  /** `opening` : ouverture en cours (document chargé ou composant monté, `open` pas encore émis). */
+  private phase: 'closed' | 'opening' | 'open' = 'closed';
+  /** Vrai entre l'émission de `open` et celle de `close`. */
+  private announced = false;
+  /** Numéro de la dernière opération d'ouverture ou de fermeture. */
+  private opSeq = 0;
   private destroyed = false;
   private title: string | null = null;
   private restoreTarget: HTMLElement | null = null;
@@ -281,46 +290,88 @@ class ReaderImpl implements Reader {
       const exclude = options.exclude ?? this.options.exclude;
       parsed = parseSource(source, { ...(locale ? { locale } : {}), ...(exclude ? { exclude } : {}) });
     } catch (error) {
-      throw this.fail(error instanceof ReaderError ? error : new ReaderError('PARSE_ERROR', 'Impossible d’extraire le contenu.', { cause: error }));
+      throw this.fail(asReaderError(error, 'PARSE_ERROR', 'Impossible d’extraire le contenu.'));
     }
 
-    if (activeReader && activeReader !== this) activeReader.closeWith('superseded');
+    // Chaque ouverture reçoit un numéro. Une ouverture, une fermeture ou une
+    // destruction ultérieure — y compris depuis un abonné appelé pendant
+    // celle-ci — la rend caduque : elle est alors rejetée avec ABORTED sans
+    // toucher à l'état, déjà pris en charge par l'opération plus récente.
+    const seq = ++this.opSeq;
+    const stale = () => seq !== this.opSeq || this.destroyed;
+
+    // Une seule modale : la place est revendiquée avant de fermer l'autre
+    // lecteur, dont les abonnés à « close » peuvent rappeler open().
+    const other = activeReader;
     // eslint-disable-next-line @typescript-eslint/no-this-alias -- registre module des lecteurs ouverts
     activeReader = this;
+    if (other && other !== this) other.closeWith('superseded');
+    if (stale() || activeReader !== this) throw this.aborted();
 
-    // Réouverture pendant la lecture : la lecture en cours est d'abord suspendue (événement pause).
-    if (this.open_) this.engine.pause('api');
-    if (!this.open_) {
+    if (this.phase === 'open') {
+      // Réouverture pendant la lecture : la lecture est d'abord suspendue (événement pause).
+      this.engine.pause('api');
+      if (stale()) throw this.aborted();
+    }
+    if (this.phase === 'closed') {
       this.restoreTarget = this.options.restoreFocus === false ? null : deepActiveElement(doc);
       const view = doc.defaultView;
       this.savedScroll = view ? { x: view.scrollX, y: view.scrollY } : null;
     }
+    this.phase = 'opening';
 
     const firstHeading = parsed.blocks.find((b) => b.kind === 'heading');
-    this.title = options.title ?? (firstHeading ? parsed.text.slice(firstHeading.start, firstHeading.end) : this.labels.dialogTitle);
+    const title = options.title ?? (firstHeading ? parsed.text.slice(firstHeading.start, firstHeading.end) : this.labels.dialogTitle);
+    this.title = title;
 
-    this.engine.load(parsed, options.startAt ?? 0);
-    const element = this.ensureElement(doc);
-    const container = this.options.container?.isConnected ? this.options.container : doc.body;
-    if (element.parentNode !== container) container.append(element);
-    element.open(parsed, this.title);
-    this.open_ = true;
+    // Ouverture transactionnelle : tout échec ramène à l'état fermé
+    // (aucun élément monté, aucun document chargé) avec une ReaderError.
+    let element: ReaderElement;
+    try {
+      element = this.ensureElement(doc);
+      const container = this.options.container?.isConnected ? this.options.container : doc.body;
+      if (element.parentNode !== container) container.append(element);
+    } catch (error) {
+      this.closeWith('error');
+      throw this.fail(asReaderError(error, 'ENVIRONMENT', 'Impossible de créer le composant du lecteur.'));
+    }
+
+    this.engine.load(parsed, options.startAt ?? 0); // émet « progress »
+    if (stale()) throw this.aborted();
+
+    try {
+      element.open(parsed, title);
+    } catch (error) {
+      this.closeWith('error');
+      throw this.fail(asReaderError(error, 'ENVIRONMENT', 'Impossible d’afficher le dialogue du lecteur.'));
+    }
+    this.phase = 'open';
+    this.announced = true;
     this.listenVisibility(doc);
 
-    this.emit('open', { title: this.title, wordCount: parsed.words.length, sentenceCount: parsed.sentences.length, sourceType: source.type });
-    if (options.autoPlay ?? this.options.autoPlay) this.engine.play();
+    this.emit('open', { title, wordCount: parsed.words.length, sentenceCount: parsed.sentences.length, sourceType: source.type });
+    if ((options.autoPlay ?? this.options.autoPlay) && !stale() && this.phase === 'open') this.engine.play();
   }
 
   close(): void {
     this.closeWith('api');
   }
 
-  /** @internal */
+  /**
+   * Ferme le lecteur (ou annule une ouverture en cours). Tout l'état est
+   * nettoyé avant de notifier les abonnés, qui peuvent donc rouvrir ou
+   * détruire le lecteur sans conflit. Les événements `pause` (raison
+   * `close`) et `close` ne sont émis que si `open` l'avait été.
+   * @internal
+   */
   closeWith(reason: CloseReason): void {
-    if (!this.open_) return;
-    this.open_ = false;
-    this.engine.pause('close');
+    if (this.phase === 'closed') return;
+    this.opSeq++; // rend caduque toute ouverture en cours
+    const wasPlaying = this.engine.getSnapshot().status === 'playing';
     const position = this.getPosition();
+    const announced = this.announced;
+    this.phase = 'closed';
+    this.announced = false;
     this.engine.unload();
     if (this.visibilityHandler) {
       this.element?.ownerDocument.removeEventListener('visibilitychange', this.visibilityHandler);
@@ -334,17 +385,26 @@ class ReaderImpl implements Reader {
     if (activeReader === this) activeReader = null;
     this.restoreHost();
     this.title = null;
-    this.emit('close', { reason, position });
+    if (!announced) return;
+    const seq = this.opSeq;
+    if (wasPlaying && position) this.emit('pause', { ...position, reason: 'close' });
+    // Un abonné à « pause » a pu rouvrir le lecteur : la fermeture n'est alors plus d'actualité.
+    if (seq === this.opSeq) this.emit('close', { reason, position });
   }
 
   destroy(): void {
     if (this.destroyed) return;
-    this.closeWith('destroy');
+    // Marqué détruit avant toute notification : un abonné ne peut plus rouvrir.
     this.destroyed = true;
+    this.closeWith('destroy');
     this.engine.destroy();
     this.element?.teardown();
     this.element = null;
     this.events.clear();
+  }
+
+  private aborted(): ReaderError {
+    return this.fail(new ReaderError('ABORTED', 'Ouverture interrompue par un appel plus récent (open, close ou destroy).'));
   }
 
   private restoreHost(): void {
@@ -378,7 +438,7 @@ class ReaderImpl implements Reader {
     const tag = defineReaderElement(this.options.tagName ?? DEFAULT_TAG_NAME);
     const el = doc.createElement(tag) as ReaderElement;
     if (typeof el.attach !== 'function') {
-      throw this.fail(new ReaderError('ENVIRONMENT', `L'élément <${tag}> est déjà défini par un autre script.`));
+      throw new ReaderError('ENVIRONMENT', `L'élément <${tag}> est déjà défini par un autre script.`);
     }
     el.attach(this.viewHost);
     this.element = el;
@@ -401,7 +461,7 @@ class ReaderImpl implements Reader {
   // ───────────── commandes ─────────────
 
   play(): void {
-    if (this.open_) this.engine.play();
+    if (this.phase === 'open') this.engine.play();
   }
 
   pause(): void {
@@ -409,11 +469,11 @@ class ReaderImpl implements Reader {
   }
 
   resume(): void {
-    if (this.open_) this.engine.resume();
+    if (this.phase === 'open') this.engine.resume();
   }
 
   toggle(): void {
-    if (this.open_) this.engine.toggle('api');
+    if (this.phase === 'open') this.engine.toggle('api');
   }
 
   seek(index: number): void {
@@ -489,12 +549,16 @@ class ReaderImpl implements Reader {
     const { settings, changed } = result;
     if (changed.length === 0) return this.getSettings();
     this.settings = settings;
-    if (changed.includes('timing') || changed.includes('acceleration')) {
-      // `configure` applique aussi la vitesse (et réarme l'accélération si elle a changé).
-      this.engine.configure({ timing: settings.timing, acceleration: settings.acceleration, speed: settings.speed });
-    } else if (configureSpeed && changed.includes('speed')) {
-      this.engine.setSpeed(settings.speed);
+    // Une vitesse explicite est un changement manuel (elle arrête l'accélération),
+    // sauf si le même changement (ré)active l'accélération : la vitesse devient
+    // alors la vitesse de base, appliquée à la fin de la montée désactivée.
+    const accelerationChanged = changed.includes('acceleration');
+    const speedChanged = configureSpeed && changed.includes('speed');
+    const rampArmed = accelerationChanged && settings.acceleration.enabled;
+    if (changed.includes('timing') || accelerationChanged) {
+      this.engine.configure({ timing: settings.timing, acceleration: settings.acceleration, ...(speedChanged && rampArmed ? { speed: settings.speed } : {}) });
     }
+    if (speedChanged && !rampArmed) this.engine.setSpeed(settings.speed);
     this.element?.applySettings(settings);
     this.persist();
     this.emit('settings-change', { settings: this.getSettings(), changed, source });
@@ -518,11 +582,11 @@ class ReaderImpl implements Reader {
 
   getState(): ReaderState {
     const s = this.engine.getSnapshot();
-    const status: ReaderStatus = this.destroyed ? 'destroyed' : !this.open_ ? 'closed' : s.status === 'idle' ? 'closed' : s.status;
+    const status: ReaderStatus = this.destroyed ? 'destroyed' : this.phase !== 'open' || s.status === 'idle' ? 'closed' : s.status;
     return {
       status,
       engineStatus: s.status,
-      isOpen: this.open_,
+      isOpen: this.phase === 'open',
       position: toPosition(s),
       speed: s.speed,
       accelerating: s.accelerating,
@@ -539,7 +603,7 @@ class ReaderImpl implements Reader {
   }
 
   get isOpen(): boolean {
-    return this.open_;
+    return this.phase === 'open';
   }
 
   get isDestroyed(): boolean {

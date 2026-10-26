@@ -17,6 +17,15 @@
 - Le thème suit `prefers-color-scheme`, ou un choix explicite ; il n'existe pas de thème personnalisable par variables CSS publiques.
 - Libellés intégrés en français et en anglais seulement (surcharge possible via `labels`).
 
+## Analyse HTML
+- `DOMParser` n'exécute aucun script et le document produit n'est jamais inséré dans la page. Les navigateurs actuels n'y chargent pas de ressources, mais la spécification ne le garantit pas formellement.
+- Sous une politique **Trusted Types** (`require-trusted-types-for 'script'`), l'analyse d'une chaîne HTML peut être refusée : la source `html` échoue alors avec `ENVIRONMENT` (préférez `dom` ou `text`), et le HTML inclus dans du Markdown passe par le repli ci-dessous.
+- **Repli sans DOM** (Node, ou analyse refusée) : le HTML inclus dans du Markdown est réduit à son texte par expressions régulières. Les scripts et styles sont exclus et les frontières de mots conservées, mais l'attribut `hidden` et les styles ne sont pas pris en compte.
+
+## Performance
+- Le texte intégral crée un élément par mot, et l'alignement ORP mesure le mot affiché à chaque changement. Aucun budget n'est encore fixé pour les très longs documents (au-delà de quelques dizaines de milliers de mots) ; il n'y a pas de virtualisation.
+- La construction du modèle est linéaire ; elle reste synchrone à l'ouverture.
+
 ## Environnement
 - Navigateurs : `<dialog>`/`showModal()`, les Custom Elements et le Shadow DOM sont requis (Safari 15.4 ou plus récent). Sans eux, `open()` est rejeté avec `ENVIRONMENT`.
 - Les tests E2E et visuels ne s'exécutent que sur **Chromium** (desktop et émulation Pixel 7). Firefox et WebKit n'ont pas été testés automatiquement.

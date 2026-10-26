@@ -70,26 +70,68 @@ function balancedSize(length: number): number {
   return Math.ceil(length / Math.ceil(length / WORD_PIECE));
 }
 
-/** Découpe un mot de lecture trop long en segments, aux frontières de tokens. */
-function splitLongChunk(tokens: Token[], c: Chunk, letters: (t: Token) => number, max: number): Chunk[] {
-  let total = 0;
-  for (let i = c.tokenStart; i < c.tokenEnd; i++) total += letters(tokens[i]!);
-  if (total <= max) return [c];
+/** Token en cours de construction, avant attribution des index globaux. */
+interface DraftToken {
+  kind: TokenKind;
+  text: string;
+  /** Offset dans le bloc. */
+  offset: number;
+  /** Nombre de graphèmes lettres/chiffres. */
+  letters: number;
+}
+
+/** Découpe un token lexical en morceaux d'au plus `size` lettres (équilibrés). */
+function splitDraft(t: DraftToken, size: number, segmenter: Segmenter): DraftToken[] {
+  const pieces = Math.ceil(t.letters / size);
+  const per = Math.ceil(t.letters / pieces);
+  const out: DraftToken[] = [];
+  let text = '';
+  let letters = 0;
+  let offset = t.offset;
+  for (const g of segmenter.graphemes(t.text)) {
+    const isLetter = LETTER_OR_DIGIT.test(g);
+    if (isLetter && letters === per) {
+      out.push({ kind: t.kind, text, offset, letters });
+      offset += text.length;
+      text = '';
+      letters = 0;
+    }
+    text += g;
+    if (isLetter) letters++;
+  }
+  if (text) out.push({ kind: t.kind, text, offset, letters });
+  return out;
+}
+
+/**
+ * Découpe un mot de lecture trop long (> `max` lettres) en segments d'au plus
+ * `balancedSize(total)` ≤ 16 lettres. Les frontières de tokens (traits
+ * d'union, apostrophes) sont utilisées en priorité ; un token plus long que
+ * la taille cible est lui-même découpé, afin de garantir la borne.
+ */
+function splitLongChunk(drafts: DraftToken[], max: number, segmenter: Segmenter): { drafts: DraftToken[]; continues: boolean }[] {
+  const total = drafts.reduce((n, t) => n + t.letters, 0);
+  if (total <= max) return [{ drafts, continues: false }];
   const target = balancedSize(total);
-  const out: Chunk[] = [];
-  let start = c.tokenStart;
+  const expanded = drafts.flatMap((t) => (t.letters > target ? splitDraft(t, target, segmenter) : [t]));
+  const out: { drafts: DraftToken[]; continues: boolean }[] = [];
+  let current: DraftToken[] = [];
   let count = 0;
-  for (let i = c.tokenStart; i < c.tokenEnd; i++) {
-    const n = letters(tokens[i]!);
-    if (n > 0 && count > 0 && count + n > target) {
-      out.push({ tokenStart: start, tokenEnd: i, continues: true });
-      start = i;
+  for (const t of expanded) {
+    if (t.letters > 0 && count > 0 && count + t.letters > target) {
+      out.push({ drafts: current, continues: true });
+      current = [];
       count = 0;
     }
-    count += n;
+    current.push(t);
+    count += t.letters;
   }
-  out.push({ tokenStart: start, tokenEnd: c.tokenEnd });
+  out.push({ drafts: current, continues: false });
   return out;
+}
+
+function toDraft(t: Token, letters: number): DraftToken {
+  return { kind: t.kind, text: t.text, offset: t.start, letters };
 }
 
 function tokenKind(segment: string, isWordLike: boolean): TokenKind {
@@ -153,6 +195,9 @@ function chunkBlock(tokens: Token[], from: number, to: number): Chunk[] {
     for (let i = c.tokenStart; i < c.tokenEnd; i++) if (isLexical(tokens[i]!)) return true;
     return false;
   };
+  // Présence d'un groupe lexical après l'indice k (précalculée : parcours linéaire).
+  const lexicalAfter = new Array<boolean>(split.length + 1).fill(false);
+  for (let k = split.length - 1; k >= 0; k--) lexicalAfter[k] = lexicalAfter[k + 1]! || hasLexical(split[k]!);
   const result: Chunk[] = [];
   let pendingOpen: Chunk | null = null;
   for (let k = 0; k < split.length; k++) {
@@ -170,7 +215,7 @@ function chunkBlock(tokens: Token[], from: number, to: number): Chunk[] {
       .map((t) => t.text)
       .join('');
     const prev = result[result.length - 1];
-    const hasNext = split.slice(k + 1).some(hasLexical);
+    const hasNext = lexicalAfter[k + 1]!;
     if (pendingOpen) {
       pendingOpen.tokenEnd = c.tokenEnd;
     } else if ((OPENING.test(text) && hasNext) || (!prev && hasNext)) {
@@ -256,37 +301,38 @@ export function buildDocument(rawBlocks: readonly RawBlock[], options: BuildDocu
     text += blockText;
     const blockIndex = blocks.length;
 
-    const tokenFrom = tokens.length;
-    const letterCounts = new Map<Token, number>();
-    const pushToken = (kind: TokenKind, segment: string, offset: number, letterCount: number) => {
-      const token: Token = { index: tokens.length, kind, text: segment, start: blockStart + offset, end: blockStart + offset + segment.length, blockIndex };
-      tokens.push(token);
-      letterCounts.set(token, letterCount);
-    };
+    // Tokens provisoires du bloc (offsets locaux), puis mots de lecture.
+    const drafts: Token[] = [];
+    const draftLetters: number[] = [];
     for (const seg of segmenter.words(blockText)) {
       const kind = tokenKind(seg.segment, seg.isWordLike);
-      if (kind !== 'word' && kind !== 'number') {
-        pushToken(kind, seg.segment, seg.index, 0);
-        continue;
-      }
-      const graphemes = segmenter.graphemes(seg.segment);
-      const count = graphemes.filter((g) => LETTER_OR_DIGIT.test(g)).length;
-      if (count <= maxWordLength) {
-        pushToken(kind, seg.segment, seg.index, count);
-        continue;
-      }
-      // Segment lexical trop long : découpé en morceaux équilibrés.
-      const size = balancedSize(graphemes.length);
-      let offset = seg.index;
-      for (let i = 0; i < graphemes.length; i += size) {
-        const piece = graphemes.slice(i, i + size).join('');
-        pushToken(kind, piece, offset, piece.length > 0 ? [...segmenter.graphemes(piece)].filter((g) => LETTER_OR_DIGIT.test(g)).length : 0);
-        offset += piece.length;
+      let letters = 0;
+      if (kind === 'word' || kind === 'number') for (const g of segmenter.graphemes(seg.segment)) if (LETTER_OR_DIGIT.test(g)) letters++;
+      drafts.push({ index: drafts.length, kind, text: seg.segment, start: seg.index, end: seg.index + seg.segment.length, blockIndex });
+      draftLetters.push(letters);
+    }
+
+    // Tokens définitifs : les mots trop longs sont découpés (et leurs tokens si nécessaire).
+    const tokenFrom = tokens.length;
+    const chunks: Chunk[] = [];
+    const pushDraft = (d: DraftToken) => {
+      tokens.push({ index: tokens.length, kind: d.kind, text: d.text, start: blockStart + d.offset, end: blockStart + d.offset + d.text.length, blockIndex });
+    };
+    let cursor = 0;
+    for (const c of chunkBlock(drafts, 0, drafts.length)) {
+      // Espaces entre deux mots de lecture.
+      for (; cursor < c.tokenStart; cursor++) pushDraft(toDraft(drafts[cursor]!, draftLetters[cursor]!));
+      const own: DraftToken[] = [];
+      for (let i = c.tokenStart; i < c.tokenEnd; i++) own.push(toDraft(drafts[i]!, draftLetters[i]!));
+      cursor = c.tokenEnd;
+      for (const part of splitLongChunk(own, maxWordLength, segmenter)) {
+        const start = tokens.length;
+        part.drafts.forEach(pushDraft);
+        chunks.push(part.continues ? { tokenStart: start, tokenEnd: tokens.length, continues: true } : { tokenStart: start, tokenEnd: tokens.length });
       }
     }
-    const tokenTo = tokens.length;
+    for (; cursor < drafts.length; cursor++) pushDraft(toDraft(drafts[cursor]!, draftLetters[cursor]!));
 
-    const chunks = chunkBlock(tokens, tokenFrom, tokenTo).flatMap((c) => splitLongChunk(tokens, c, (t) => letterCounts.get(t) ?? 0, maxWordLength));
     const wordFrom = words.length;
     for (const c of chunks) {
       const start = tokens[c.tokenStart]!.start;

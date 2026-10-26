@@ -156,7 +156,7 @@ const off = reader.on('close', ({ reason }) => console.debug('lecteur fermé', r
 reader.on('error', ({ error }) => { if (error.fatal) showToast(error.message); });
 ```
 
-- `open()` est rejeté avec une `ReaderError` dont le `code` vaut `INVALID_SOURCE`, `EMPTY_CONTENT`, `PARSE_ERROR`, `ENVIRONMENT` ou `DESTROYED`. Gérez au moins `EMPTY_CONTENT` (section vide), par exemple en désactivant le bouton.
+- `open()` est rejeté avec une `ReaderError` dont le `code` vaut `INVALID_SOURCE`, `EMPTY_CONTENT`, `PARSE_ERROR`, `ENVIRONMENT`, `DESTROYED` ou `ABORTED` (ouverture remplacée par un appel plus récent : à ignorer). Gérez au moins `EMPTY_CONTENT` (section vide), par exemple en désactivant le bouton.
 - Les erreurs `STORAGE` et `LISTENER` ne sont pas bloquantes (`fatal: false`).
 - Désabonnez-vous avec la fonction retournée par `on()`. `destroy()` retire de toute façon tous les abonnés.
 

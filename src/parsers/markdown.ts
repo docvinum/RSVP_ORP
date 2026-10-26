@@ -1,13 +1,16 @@
 import markdownIt, { type MarkdownIt, type Token } from 'markdown-it';
 import type { BlockKind, RawBlock } from '../core/model';
-import { htmlToBlocks } from './html';
+import { htmlFragmentText, htmlToBlocks, htmlToTextFallback } from './html';
 
 /**
  * Markdown (CommonMark + tableaux GFM) via markdown-it, embarqué dans le
  * build. Le Markdown n'est jamais rendu en HTML : le modèle est construit à
- * partir du flux de tokens. Le HTML brut éventuel est analysé de façon inerte
- * (texte uniquement) ; les images sont ignorées.
+ * partir du flux de tokens. Le HTML brut éventuel (blocs ou balises inline)
+ * est analysé de façon inerte avec les mêmes exclusions que les sources HTML
+ * et DOM (scripts, éléments masqués…) ; les images sont ignorées.
  */
+
+const escapeHtml = (text: string) => text.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
 
 let parser: MarkdownIt | null = null;
 
@@ -18,22 +21,31 @@ function getParser(): MarkdownIt {
 
 function inlineText(children: Token[] | null): string {
   let out = '';
+  let html = '';
+  let hasHtml = false;
   for (const t of children ?? []) {
     switch (t.type) {
       case 'text':
       case 'code_inline':
         out += t.content;
+        html += escapeHtml(t.content);
         break;
       case 'softbreak':
       case 'hardbreak':
         out += ' ';
+        html += ' ';
+        break;
+      case 'html_inline':
+        // Balise brute : reconstruite en HTML pour en extraire le texte comme une source HTML.
+        hasHtml = true;
+        html += t.content;
         break;
       default:
-        // image, html_inline, ouvertures/fermetures de liens et d'emphase : ignorés.
+        // image, ouvertures/fermetures de liens et d'emphase : ignorés.
         break;
     }
   }
-  return out;
+  return hasHtml ? htmlFragmentText(html) : out;
 }
 
 function hasDomParser(): boolean {
@@ -77,7 +89,15 @@ export function markdownToBlocks(markdown: string): RawBlock[] {
         blocks.push({ kind: 'code', text: t.content });
         break;
       case 'html_block':
-        if (hasDomParser()) blocks.push(...htmlToBlocks(t.content));
+        if (hasDomParser()) {
+          try {
+            blocks.push(...htmlToBlocks(t.content));
+            break;
+          } catch {
+            // Analyse refusée : repli ci-dessous.
+          }
+        }
+        blocks.push({ kind: 'paragraph', text: htmlToTextFallback(t.content) });
         break;
       case 'inline': {
         const text = inlineText(t.children);

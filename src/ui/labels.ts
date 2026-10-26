@@ -1,3 +1,5 @@
+import { deepFreeze } from '../core/freeze';
+
 /** Libellés de l'interface. Français par défaut, anglais intégré, surcharge possible. */
 export interface Labels {
   dialogTitle: string;
@@ -55,7 +57,7 @@ export interface Labels {
   colors: Record<string, string>;
 }
 
-export const LABELS_FR: Labels = {
+export const LABELS_FR: Readonly<Labels> = deepFreeze<Labels>({
   dialogTitle: 'Lecture rapide',
   close: 'Fermer le lecteur',
   play: 'Lecture',
@@ -124,9 +126,9 @@ export const LABELS_FR: Labels = {
     ['Échap', 'Fermer'],
   ],
   colors: { '#d32f2f': 'Rouge', '#e65100': 'Orange', '#2e7d32': 'Vert', '#1565c0': 'Bleu', '#6a1b9a': 'Violet' },
-};
+});
 
-export const LABELS_EN: Labels = {
+export const LABELS_EN: Readonly<Labels> = deepFreeze<Labels>({
   ...LABELS_FR,
   dialogTitle: 'Speed reading',
   close: 'Close reader',
@@ -196,7 +198,7 @@ export const LABELS_EN: Labels = {
     ['Esc', 'Close'],
   ],
   colors: { '#d32f2f': 'Red', '#e65100': 'Orange', '#2e7d32': 'Green', '#1565c0': 'Blue', '#6a1b9a': 'Purple' },
-};
+});
 
 export type LabelLocale = 'fr' | 'en';
 

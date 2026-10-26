@@ -54,7 +54,7 @@ export interface Labels {
     shortcutList: [string, string][];
     colors: Record<string, string>;
 }
-export declare const LABELS_FR: Labels;
-export declare const LABELS_EN: Labels;
+export declare const LABELS_FR: Readonly<Labels>;
+export declare const LABELS_EN: Readonly<Labels>;
 export type LabelLocale = 'fr' | 'en';
 export declare function resolveLabels(locale?: LabelLocale, overrides?: Partial<Labels>): Labels;

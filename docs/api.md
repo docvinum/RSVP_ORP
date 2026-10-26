@@ -46,7 +46,7 @@ Les réglages initiaux sont résolus dans cet ordre : valeurs par défaut (profi
 ```ts
 type ReaderSource =
   | { type: 'text'; text: string }          // une ligne vide sépare les paragraphes
-  | { type: 'html'; html: string }          // DOMParser inerte : aucun script, aucune ressource
+  | { type: 'html'; html: string }          // DOMParser : aucun script exécuté, jamais inséré dans la page
   | { type: 'markdown'; markdown: string }  // markdown-it (CommonMark + tableaux), jamais rendu en HTML
   | { type: 'dom'; element: HTMLElement };  // lecture seule, aucun nœud ni attribut modifié
 ```
@@ -60,7 +60,7 @@ La vue du texte intégral est reconstruite à partir du modèle normalisé, en n
 ```ts
 open(source: ReaderSource, options?: {
   title?: string;         // défaut : premier titre du contenu, sinon « Lecture rapide »
-  startAt?: number;       // index du mot de départ
+  startAt?: number;       // index du mot de départ (tronqué et borné ; non fini → 0)
   autoPlay?: boolean;
   contentLocale?: string;
   exclude?: string;
@@ -68,8 +68,10 @@ open(source: ReaderSource, options?: {
 ```
 
 - La promesse est résolue une fois le dialogue affiché, à l'état `ready`.
-- Elle est rejetée avec une `ReaderError` (codes `INVALID_SOURCE`, `EMPTY_CONTENT`, `PARSE_ERROR`, `ENVIRONMENT`, `DESTROYED`). L'événement `error` est émis lui aussi.
+- Elle est rejetée avec une `ReaderError` (codes `INVALID_SOURCE`, `EMPTY_CONTENT`, `PARSE_ERROR`, `ENVIRONMENT`, `DESTROYED`, `ABORTED`). L'événement `error` est émis lui aussi.
+- **Ouverture transactionnelle** : en cas d'échec (composant impossible à créer, `showModal()` refusé…), le lecteur revient à l'état fermé, sans élément monté ni document chargé, et une `ReaderError` est toujours rejetée — jamais une exception brute.
 - **Appel répété pendant l'ouverture** : la lecture en cours est mise en pause (événement `pause`, raison `api`), puis le contenu est remplacé. Le dialogue reste ouvert, le focus d'origine est conservé et `open` est émis de nouveau.
+- **Réentrance** : les événements sont synchrones et les abonnés peuvent appeler toute méthode, y compris pendant une ouverture (par exemple depuis `progress`). Un `open()`, `close()` ou `destroy()` ultérieur rend l'ouverture en cours caduque : elle est rejetée avec `ABORTED` et l'état final est celui de l'opération la plus récente. Une ouverture annulée avant d'aboutir n'émet ni `open` ni `close`.
 - **Instances simultanées** : une seule modale est ouverte à la fois dans la page. Ouvrir un lecteur B pendant que A est ouvert ferme A, qui émet `close` avec la raison `superseded`.
 
 ## Commandes
@@ -136,7 +138,7 @@ reader.once('complete', handler);
 | `pause` | `ReaderPosition & { reason: 'user' \| 'api' \| 'hidden' \| 'close' }` | Passage de `playing` à `paused` |
 | `progress` | `ReaderPosition` | À chaque changement de mot (lecture ou navigation) |
 | `complete` | `ReaderPosition` | Dernier mot affiché pendant toute sa durée |
-| `close` | `{ reason: 'user' \| 'api' \| 'superseded' \| 'destroy' \| 'detached', position }` | Fermeture. `detached` : le conteneur a été retiré du document (changement de route). |
+| `close` | `{ reason: 'user' \| 'api' \| 'superseded' \| 'destroy' \| 'detached' \| 'error', position }` | Fermeture d'un lecteur dont `open` a été émis. `detached` : le conteneur a été retiré du document (changement de route) ; `error` : échec d'une réouverture. Si un abonné à `pause` (raison `close`) rouvre le lecteur, `close` n'est pas émis. |
 | `error` | `{ error: ReaderError }` | Échec d'ouverture, stockage indisponible (`fatal: false`), exception dans un abonné (`LISTENER`, `fatal: false`) |
 | `settings-change` | `{ settings, changed, source: 'user' \| 'api' \| 'preferences' }` | Changement effectif de réglages (`changed` ⊂ `profile`, `speed`, `timing`, `acceleration`, `appearance`) |
 
@@ -153,6 +155,7 @@ Une exception levée par un abonné est isolée : elle n'interrompt ni la lectur
 | `PARSE_ERROR` | Échec inattendu de l'extraction | oui |
 | `ENVIRONMENT` | `document`, `customElements`, `<dialog>` ou `DOMParser` indisponible | oui |
 | `DESTROYED` | `open()` sur un lecteur détruit | oui |
+| `ABORTED` | Ouverture rendue caduque par un `open()`, `close()` ou `destroy()` ultérieur | non |
 | `STORAGE` | Lecture ou écriture des préférences impossible | non |
 | `LISTENER` | Exception dans un abonné aux événements | non |
 
@@ -169,6 +172,8 @@ reader.setPreferences(prefs);          // retourne false si les préférences so
 ```
 
 - Les règles de profil, les bornes et les coefficients sont détaillés dans [profiles-and-timing.md](profiles-and-timing.md).
+- Une vitesse fournie à `updateSettings` est un changement manuel : elle arrête l'accélération en cours, quels que soient les autres champs du patch. Seule exception : si le même patch modifie et active l'accélération, la vitesse devient la vitesse de base et la montée repart de la vitesse de départ.
+- Les constantes exportées (`PROFILES`, `TIMING_PRESETS`, `TIMING_BOUNDS`, `LABELS_FR`…) sont gelées en profondeur.
 - Par défaut, **rien n'est écrit** dans `localStorage`. Avec `persistence.enabled`, chaque changement effectif est enregistré sous la clé configurée, au format `{ version: 1, settings }`.
 - Les préférences ne contiennent **jamais** de texte source, de contenu lu, de position ni d'historique.
 - Une erreur de stockage (quota dépassé, navigation privée…) émet `error` (`STORAGE`, non bloquant), et la lecture continue.

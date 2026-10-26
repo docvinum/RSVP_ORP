@@ -96,7 +96,7 @@ Le lecteur crée lui-même son élément `<urr-reader>` : aucun `CUSTOM_ELEMENTS
 
 | Démo | Dossier | Lancer |
 | --- | --- | --- |
-| JavaScript natif | `examples/vanilla` | `npm run build && npm run sync:examples && npm run serve`, puis <http://localhost:4173/examples/vanilla/> |
+| JavaScript natif | `examples/vanilla` | `npm run build && npm run sync:examples && npm run serve`, puis <http://127.0.0.1:4173/examples/vanilla/> |
 | Vue 3 + Vite | `examples/vue` | `cd examples/vue && npm install && npm run dev` |
 | Angular 22 | `examples/angular` | `cd examples/angular && npm install && npm start` (Node ≥ 22.22.3 ou ≥ 24.15) |
 

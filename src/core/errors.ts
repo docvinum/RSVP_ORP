@@ -5,6 +5,8 @@
  * - `PARSE_ERROR` : échec inattendu de l'extraction ;
  * - `ENVIRONMENT` : API navigateur requise indisponible (DOMParser, customElements…) ;
  * - `DESTROYED` : appel d'`open()` sur un lecteur détruit ;
+ * - `ABORTED` : ouverture rendue caduque par un `open()`, `close()` ou `destroy()`
+ *   ultérieur, y compris appelé depuis un abonné (non bloquant) ;
  * - `STORAGE` : lecture/écriture des préférences impossible (non bloquant) ;
  * - `LISTENER` : un abonné aux événements a levé une exception (non bloquant).
  */
@@ -14,8 +16,11 @@ export type ReaderErrorCode =
   | 'PARSE_ERROR'
   | 'ENVIRONMENT'
   | 'DESTROYED'
+  | 'ABORTED'
   | 'STORAGE'
   | 'LISTENER';
+
+const NON_FATAL: ReadonlySet<ReaderErrorCode> = new Set(['STORAGE', 'LISTENER', 'ABORTED']);
 
 export class ReaderError extends Error {
   readonly code: ReaderErrorCode;
@@ -26,7 +31,7 @@ export class ReaderError extends Error {
     super(message, options.cause !== undefined ? { cause: options.cause } : undefined);
     this.name = 'ReaderError';
     this.code = code;
-    this.fatal = options.fatal ?? (code !== 'STORAGE' && code !== 'LISTENER');
+    this.fatal = options.fatal ?? !NON_FATAL.has(code);
   }
 }
 

@@ -4,7 +4,7 @@ Les trois applications consomment **uniquement** l'artefact compilé `dist/`, co
 
 | Démo | Lancer | Points montrés |
 | --- | --- | --- |
-| `vanilla/` | à la racine : `npm run build && npm run sync:examples && npm run serve`, puis <http://localhost:4173/examples/vanilla/> | Module ESM importé directement |
+| `vanilla/` | à la racine : `npm run build && npm run sync:examples && npm run serve`, puis <http://127.0.0.1:4173/examples/vanilla/> | Module ESM importé directement |
 | `vue/` | `npm install && npm run dev` | Composable `useRsvpReader()`, destruction au démontage |
 | `angular/` | `npm install && npm start` (Node ≥ 22.22.3 ou ≥ 24.15) | Service injectable, routeur, `ngOnDestroy`, mode zoneless |
 

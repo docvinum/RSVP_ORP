@@ -262,3 +262,87 @@ describe('RsvpEngine — accélération progressive', () => {
     expect(engine.getSnapshot()).toMatchObject({ speed: 275, accelerating: false });
   });
 });
+
+describe('RsvpEngine — réentrance depuis les abonnés', () => {
+  it('une pause demandée à la notification « playing » ne laisse aucune minuterie', () => {
+    const { time, engine } = setup();
+    engine.load(tenWords);
+    engine.on('status', (e) => {
+      if (e.status === 'playing') engine.pause('user');
+    });
+    engine.play();
+    expect(engine.getSnapshot().status).toBe('paused');
+    expect(time.pending).toBe(0);
+    time.advance(5000);
+    expect(engine.getSnapshot().index).toBe(0);
+  });
+
+  it('une pause demandée à un changement de mot ne relance pas la minuterie', () => {
+    const { time, engine } = setup();
+    engine.load(tenWords);
+    engine.play();
+    engine.on('position', (s) => {
+      if (s.index === 3) engine.pause('user');
+    });
+    time.advance(200 * 10);
+    expect(engine.getSnapshot()).toMatchObject({ status: 'paused', index: 3 });
+    expect(time.pending).toBe(0);
+  });
+
+  it('une destruction depuis un abonné arrête tout', () => {
+    const { time, engine } = setup();
+    engine.load(tenWords);
+    engine.on('position', (s) => {
+      if (s.index === 2) engine.destroy();
+    });
+    engine.play();
+    time.advance(200 * 10);
+    expect(engine.isDestroyed).toBe(true);
+    expect(time.pending).toBe(0);
+  });
+
+  it('relancer depuis « complete » dans l’abonné de statut n’émet pas de fin périmée', () => {
+    const { time, engine } = setup();
+    engine.load(doc('a b'));
+    let completes = 0;
+    engine.on('complete', () => completes++);
+    let restarted = false;
+    engine.on('status', (e) => {
+      if (e.status === 'complete' && !restarted) {
+        restarted = true;
+        engine.play();
+      }
+    });
+    engine.play();
+    time.advance(400);
+    expect(completes).toBe(0);
+    expect(engine.getSnapshot()).toMatchObject({ status: 'playing', index: 0 });
+    expect(time.pending).toBe(1);
+  });
+
+  it('seek en lecture puis pause dans l’abonné : aucune minuterie', () => {
+    const { time, engine } = setup();
+    engine.load(tenWords);
+    engine.play();
+    const off = engine.on('position', () => engine.pause('user'));
+    engine.seek(5);
+    off();
+    expect(engine.getSnapshot()).toMatchObject({ status: 'paused', index: 5 });
+    expect(time.pending).toBe(0);
+  });
+});
+
+describe('RsvpEngine — index de départ', () => {
+  it.each([
+    [Number.NaN, 0],
+    [Number.POSITIVE_INFINITY, 0],
+    [1.5, 1],
+    [-3, 0],
+    [99, 9],
+  ])('startIndex %s → %s', (start, expected) => {
+    const { engine } = setup();
+    engine.load(tenWords, start);
+    expect(engine.getSnapshot().index).toBe(expected);
+    expect(engine.currentWord()?.text).toBe(tenWords.words[expected]!.text);
+  });
+});

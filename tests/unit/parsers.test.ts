@@ -108,6 +108,26 @@ describe('Markdown', () => {
   });
 });
 
+describe('Markdown — HTML inline', () => {
+  const md = 'Avant<br>Après et <span hidden>secret</span>visible <script>alert(1)</script>fin <b>gr</b>as &amp; co.';
+
+  it('conserve les frontières de mots et applique les exclusions (DOM)', () => {
+    expect(texts(sourceToBlocks({ type: 'markdown', markdown: md }))).toEqual(['Avant Après et visible fin gras & co.']);
+  });
+
+  it('repli sans DOMParser : frontières conservées, scripts exclus', () => {
+    const g = globalThis as { DOMParser?: unknown };
+    const saved = g.DOMParser;
+    delete g.DOMParser;
+    try {
+      const blocks = sourceToBlocks({ type: 'markdown', markdown: `${md}\n\n<div>Bloc <script>x()</script>HTML</div>` });
+      expect(texts(blocks)).toEqual(['Avant Après et secretvisible fin gras & co.', 'Bloc HTML']);
+    } finally {
+      g.DOMParser = saved;
+    }
+  });
+});
+
 describe('DOM (lecture seule)', () => {
   function fixture() {
     document.body.innerHTML = `

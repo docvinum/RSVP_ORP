@@ -43,7 +43,7 @@ npm run examples:install && npm run examples:build
 
 - La CLI Angular 22 exige **Node ≥ 22.22.3 ou ≥ 24.15**. Avec un Node plus ancien, lancez `npx -y node@24 examples/angular/node_modules/@angular/cli/bin/ng.js build --base-href ./` depuis `examples/angular`.
 - Chromium est la seule cible E2E. `@playwright/test` est épinglé en **1.63.0**, la version des navigateurs préinstallés : ne le mettez pas à jour sans raison.
-- Le serveur de test (`scripts/serve.mjs`, port 4173) est lancé automatiquement par Playwright.
+- Le serveur de test (`scripts/serve.mjs`, `127.0.0.1:4173`) est lancé automatiquement par Playwright. Il n'écoute qu'en local et refuse tout chemin hors de la racine (`tests/unit/serve.test.ts`).
 
 ## 3. Invariants à ne jamais casser
 
@@ -60,7 +60,8 @@ Chacun est couvert par des tests. Si un test échoue, corrigez le code ; n'affai
 9. **Module importable sans DOM (SSR).** `HTMLElement` n'est lu qu'à l'ouverture : la classe est créée dans `getElementClass()`. N'écrivez pas de `class X extends HTMLElement` au niveau du module.
 10. **Index stables.** Le modèle (`buildDocument`) est déterministe. La vue intégrale et le moteur se synchronisent uniquement par `Word.index` et `Sentence.index` (`data-w`, `data-s`).
 11. **Réglages toujours validés.** Toute entrée (options, préférences, formulaire, API) passe par `normalizeSettings` ou `applySettingsPatch` (`src/core/settings.ts`). Les constantes de profils et de niveaux sont gelées (`Object.freeze`).
-12. **Alignement ORP.** Le centre de la lettre ORP est sur l'axe, à 1 px près. Le calcul pur se trouve dans `src/ui/orp-layout.ts` et le rendu est vérifié par `tests/e2e/reader/orp.spec.ts`. Un changement de CSS de `.stage` ou `.word` exige de relancer ce test.
+12. **Réentrance.** Les événements sont synchrones : un abonné peut appeler n'importe quelle méthode. Dans le moteur, l'état (statut, index, minuterie) est complet **avant** toute notification et relu après. Dans l'API, `open()` porte un numéro d'opération (`opSeq`) vérifié après chaque notification ; `closeWith()` nettoie tout avant d'émettre ; `open()` est transactionnel (échec → retour à l'état fermé, `ReaderError` uniquement). Tests : `engine.test.ts` (« réentrance ») et `lifecycle.spec.ts` (« réentrance et ouvertures interrompues »).
+13. **Alignement ORP.** Le centre de la lettre ORP est sur l'axe, à 1 px près. Le calcul pur se trouve dans `src/ui/orp-layout.ts` et le rendu est vérifié par `tests/e2e/reader/orp.spec.ts`. Un changement de CSS de `.stage` ou `.word` exige de relancer ce test.
 
 ## 4. Règles de produit (décisions validées)
 

@@ -5,6 +5,8 @@
  * sans passer par ce module.
  */
 
+import { deepFreeze } from './freeze';
+
 export type ProfileId = 'comfort' | 'standard' | 'fast' | 'custom';
 export type PresetProfileId = Exclude<ProfileId, 'custom'>;
 export type TimingLevel = 'light' | 'normal' | 'strong';
@@ -85,7 +87,7 @@ export const SPEED: Readonly<NumberBounds & { step: number }> = Object.freeze({ 
 export const FONT_SIZE: Readonly<NumberBounds> = Object.freeze({ min: 24, max: 96, step: 2, default: 48 });
 export const ACCELERATION_DURATION: Readonly<NumberBounds> = Object.freeze({ min: 5, max: 600, step: 5, default: 60 });
 
-export const TIMING_BOUNDS: Readonly<Record<keyof TimingCoefficients, Readonly<NumberBounds>>> = Object.freeze({
+export const TIMING_BOUNDS: Readonly<Record<keyof TimingCoefficients, Readonly<NumberBounds>>> = deepFreeze({
   comma: { min: 1, max: 4, step: 0.05, default: 1.5 },
   clause: { min: 1, max: 5, step: 0.05, default: 1.75 },
   sentence: { min: 1, max: 6, step: 0.05, default: 2.25 },
@@ -96,7 +98,7 @@ export const TIMING_BOUNDS: Readonly<Record<keyof TimingCoefficients, Readonly<N
 });
 
 /** Niveaux de pauses prédéfinis (immuables). */
-export const TIMING_PRESETS: Readonly<Record<TimingLevel, Readonly<TimingCoefficients>>> = Object.freeze({
+export const TIMING_PRESETS: Readonly<Record<TimingLevel, Readonly<TimingCoefficients>>> = deepFreeze({
   light: Object.freeze({ comma: 1.2, clause: 1.4, sentence: 1.6, paragraph: 2, longWordThreshold: 10, longWordStep: 0.03, longWordMaxExtra: 0.3 }),
   normal: Object.freeze({ comma: 1.5, clause: 1.75, sentence: 2.25, paragraph: 3, longWordThreshold: 8, longWordStep: 0.05, longWordMaxExtra: 0.5 }),
   strong: Object.freeze({ comma: 1.8, clause: 2.2, sentence: 2.8, paragraph: 4, longWordThreshold: 7, longWordStep: 0.08, longWordMaxExtra: 0.8 }),
@@ -111,7 +113,7 @@ export interface ProfilePreset {
  * Profils prédéfinis (immuables). Les vitesses sont des paramètres de produit,
  * pas des affirmations sur les capacités de lecture.
  */
-export const PROFILES: Readonly<Record<PresetProfileId, Readonly<ProfilePreset>>> = Object.freeze({
+export const PROFILES: Readonly<Record<PresetProfileId, Readonly<ProfilePreset>>> = deepFreeze({
   comfort: Object.freeze({ speed: 200, timingLevel: 'strong' as const }),
   standard: Object.freeze({ speed: 250, timingLevel: 'normal' as const }),
   fast: Object.freeze({ speed: 400, timingLevel: 'light' as const }),
