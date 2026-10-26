@@ -16,7 +16,16 @@ export interface BuildDocumentOptions {
   locale?: string;
   /** Force une stratégie de segmentation (tests, compatibilité). */
   segmentation?: 'intl' | 'fallback';
+  /**
+   * Au-delà de ce nombre de lettres, un mot est découpé en segments
+   * équilibrés d'au plus 16 lettres (affichés avec un trait d'union) pour
+   * rester lisible sur écran étroit. Défaut : 25 (min. 12).
+   */
+  maxWordLength?: number;
 }
+
+/** Taille cible des segments d'un mot trop long. */
+const WORD_PIECE = 16;
 
 /** Séparateur inséré entre deux blocs dans `NormalizedDocument.text`. */
 export const BLOCK_SEPARATOR = '\n\n';
@@ -53,6 +62,34 @@ const TERMINAL_ABBREVIATIONS = new Set(['etc', 'al']);
 interface Chunk {
   tokenStart: number;
   tokenEnd: number;
+  /** Segment non final d'un mot trop long. */
+  continues?: boolean;
+}
+
+function balancedSize(length: number): number {
+  return Math.ceil(length / Math.ceil(length / WORD_PIECE));
+}
+
+/** Découpe un mot de lecture trop long en segments, aux frontières de tokens. */
+function splitLongChunk(tokens: Token[], c: Chunk, letters: (t: Token) => number, max: number): Chunk[] {
+  let total = 0;
+  for (let i = c.tokenStart; i < c.tokenEnd; i++) total += letters(tokens[i]!);
+  if (total <= max) return [c];
+  const target = balancedSize(total);
+  const out: Chunk[] = [];
+  let start = c.tokenStart;
+  let count = 0;
+  for (let i = c.tokenStart; i < c.tokenEnd; i++) {
+    const n = letters(tokens[i]!);
+    if (n > 0 && count > 0 && count + n > target) {
+      out.push({ tokenStart: start, tokenEnd: i, continues: true });
+      start = i;
+      count = 0;
+    }
+    count += n;
+  }
+  out.push({ tokenStart: start, tokenEnd: c.tokenEnd });
+  return out;
 }
 
 function tokenKind(segment: string, isWordLike: boolean): TokenKind {
@@ -202,6 +239,7 @@ function abbreviationKind(text: string): AbbreviationKind {
  */
 export function buildDocument(rawBlocks: readonly RawBlock[], options: BuildDocumentOptions = {}): NormalizedDocument {
   const locale = options.locale ?? 'fr';
+  const maxWordLength = Math.max(12, Math.floor(options.maxWordLength ?? 25));
   const segmenter: Segmenter = getSegmenter(locale, options.segmentation);
 
   const blocks: Block[] = [];
@@ -219,25 +257,42 @@ export function buildDocument(rawBlocks: readonly RawBlock[], options: BuildDocu
     const blockIndex = blocks.length;
 
     const tokenFrom = tokens.length;
+    const letterCounts = new Map<Token, number>();
+    const pushToken = (kind: TokenKind, segment: string, offset: number, letterCount: number) => {
+      const token: Token = { index: tokens.length, kind, text: segment, start: blockStart + offset, end: blockStart + offset + segment.length, blockIndex };
+      tokens.push(token);
+      letterCounts.set(token, letterCount);
+    };
     for (const seg of segmenter.words(blockText)) {
-      tokens.push({
-        index: tokens.length,
-        kind: tokenKind(seg.segment, seg.isWordLike),
-        text: seg.segment,
-        start: blockStart + seg.index,
-        end: blockStart + seg.index + seg.segment.length,
-        blockIndex,
-      });
+      const kind = tokenKind(seg.segment, seg.isWordLike);
+      if (kind !== 'word' && kind !== 'number') {
+        pushToken(kind, seg.segment, seg.index, 0);
+        continue;
+      }
+      const graphemes = segmenter.graphemes(seg.segment);
+      const count = graphemes.filter((g) => LETTER_OR_DIGIT.test(g)).length;
+      if (count <= maxWordLength) {
+        pushToken(kind, seg.segment, seg.index, count);
+        continue;
+      }
+      // Segment lexical trop long : découpé en morceaux équilibrés.
+      const size = balancedSize(graphemes.length);
+      let offset = seg.index;
+      for (let i = 0; i < graphemes.length; i += size) {
+        const piece = graphemes.slice(i, i + size).join('');
+        pushToken(kind, piece, offset, piece.length > 0 ? [...segmenter.graphemes(piece)].filter((g) => LETTER_OR_DIGIT.test(g)).length : 0);
+        offset += piece.length;
+      }
     }
     const tokenTo = tokens.length;
 
-    const chunks = chunkBlock(tokens, tokenFrom, tokenTo);
+    const chunks = chunkBlock(tokens, tokenFrom, tokenTo).flatMap((c) => splitLongChunk(tokens, c, (t) => letterCounts.get(t) ?? 0, maxWordLength));
     const wordFrom = words.length;
     for (const c of chunks) {
       const start = tokens[c.tokenStart]!.start;
       const end = tokens[c.tokenEnd - 1]!.end;
       const wordText = text.slice(start, end);
-      const { punctuation } = trailingPunctuation(tokens, c);
+      const punctuation = c.continues ? 'none' : trailingPunctuation(tokens, c).punctuation;
       let letterCount = 0;
       for (const g of segmenter.graphemes(wordText)) if (LETTER_OR_DIGIT.test(g)) letterCount++;
       const index = words.length;
@@ -257,6 +312,7 @@ export function buildDocument(rawBlocks: readonly RawBlock[], options: BuildDocu
         punctuation,
         endsSentence: false,
         endsBlock: false,
+        continues: c.continues === true,
       });
     }
     const wordTo = words.length;

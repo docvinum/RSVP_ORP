@@ -127,6 +127,26 @@ describe.each(['intl', 'fallback'] as const)('buildDocument (%s)', (segmentation
   });
 });
 
+describe('mots très longs', () => {
+  it('découpe au-delà de 25 lettres en segments équilibrés, aux index stables', () => {
+    const doc = buildDocument([{ kind: 'paragraph', text: 'Le Donaudampfschifffahrtsgesellschaftskapitän arrive, anticonstitutionnellement.' }]);
+    const texts = doc.words.map((w) => w.text);
+    expect(texts).toEqual(['Le', 'Donaudampfschi', 'fffahrtsgesell', 'schaftskapitän', 'arrive,', 'anticonstitutionnellement.']);
+    expect(doc.words.map((w) => w.continues)).toEqual([false, true, true, false, false, false]);
+    // Le texte intégral reste intact et la correspondance mot ↔ texte est conservée.
+    expect(doc.text).toContain('Donaudampfschifffahrtsgesellschaftskapitän');
+    for (const w of doc.words) expect(doc.text.slice(w.start, w.end)).toBe(w.text);
+    expect(doc.words[1]!.punctuation).toBe('none');
+  });
+
+  it('préfère les frontières de tokens (traits d’union) et respecte maxWordLength', () => {
+    const doc = buildDocument([{ kind: 'paragraph', text: 'internationalisation-supercalifragilistic.' }]);
+    expect(doc.words.map((w) => w.text)).toEqual(['internationalisation-', 'supercalifragilistic.']);
+    const short = buildDocument([{ kind: 'paragraph', text: 'anticonstitutionnellement' }], { maxWordLength: 12 });
+    expect(short.words.length).toBe(2);
+  });
+});
+
 describe('normalizeText', () => {
   it('normalise NFC et fusionne les espaces mixtes', () => {
     expect(normalizeText('a \u{A0} b\u{3000}c')).toBe('a\u{A0}b c');

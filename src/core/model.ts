@@ -93,6 +93,11 @@ export interface Word {
   endsSentence: boolean;
   /** Vrai si le mot termine son bloc (paragraphe, titre…). */
   endsBlock: boolean;
+  /**
+   * Vrai si ce mot est un segment non final d'un mot trop long découpé
+   * (voir `maxWordLength`) ; l'interface l'affiche suivi d'un trait d'union.
+   */
+  continues: boolean;
 }
 
 export interface NormalizedDocument {
