@@ -385,6 +385,8 @@ class ReaderImpl implements Reader {
     const announced = this.announced;
     const restoreTarget = this.restoreTarget;
     const savedScroll = this.savedScroll;
+    // Capturé avant les notifications : un abonné peut détruire le lecteur (element → null).
+    const element = this.element;
     this.restoreTarget = null;
     this.savedScroll = null;
     this.phase = 'closed';
@@ -404,7 +406,6 @@ class ReaderImpl implements Reader {
       if (!current()) return;
     }
 
-    const element = this.element;
     if (element) {
       element.close();
       if (!current()) return;
@@ -420,8 +421,15 @@ class ReaderImpl implements Reader {
     this.destroyed = true;
     this.closeWith('destroy');
     this.engine.destroy();
-    this.element?.teardown();
+    // Le composant est retiré quelle que soit la phase : destroy() peut être appelé
+    // depuis un abonné à « pause » ou « close », pendant une fermeture déjà commencée.
+    const element = this.element;
     this.element = null;
+    if (element) {
+      element.close();
+      element.remove();
+      element.teardown();
+    }
     this.events.clear();
   }
 
@@ -570,7 +578,9 @@ class ReaderImpl implements Reader {
    * - Une vitesse modifiée (profil, préférences, patch) est appliquée au
    *   moteur comme un changement manuel : elle arrête l'accélération en cours.
    * - `explicitSpeed` : la demande contient `speed` (patch, `setSpeed()`).
-   *   Elle arrête l'accélération même si la valeur est inchangée.
+   *   Elle est appliquée au moteur même si la valeur stockée est inchangée :
+   *   elle arrête une accélération en cours et remplace la vitesse cible
+   *   atteinte par une accélération terminée.
    * - Exception : si la même demande (ré)active l'accélération, la vitesse
    *   devient la vitesse de base et la montée repart de la vitesse de départ.
    */
@@ -579,7 +589,9 @@ class ReaderImpl implements Reader {
     const accelerationChanged = changed.includes('acceleration');
     const speedChanged = changed.includes('speed');
     const rampArmed = accelerationChanged && settings.acceleration.enabled;
-    const manualSpeed = !rampArmed && (speedChanged || (explicitSpeed && this.engine.getSnapshot().accelerating));
+    // Une vitesse explicite est toujours appliquée : même égale à la valeur stockée,
+    // elle peut différer de la vitesse du moteur (montée en cours ou terminée).
+    const manualSpeed = !rampArmed && (speedChanged || explicitSpeed);
     if (changed.length === 0) {
       if (manualSpeed) this.engine.setSpeed(settings.speed);
       return this.getSettings();

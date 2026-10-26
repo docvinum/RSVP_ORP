@@ -376,3 +376,52 @@ test.describe('réentrance via le focus et pendant un remplacement', () => {
     expect(state.afterSpeedOnly).toMatchObject({ speed: 250, accelerating: false });
   });
 });
+
+test.describe('régressions de ddcd718', () => {
+  type R = {
+    open(s: unknown): Promise<void>;
+    close(): void;
+    destroy(): void;
+    play(): void;
+    setSpeed(n: number): number;
+    on(t: string, f: () => void): () => void;
+    updateSettings(p: unknown): void;
+    getState(): { status: string; isOpen: boolean; speed: number; accelerating: boolean };
+  };
+  type W = { URR: { createReader(o?: unknown): R } };
+
+  for (const event of ['close', 'pause'] as const) {
+    test(`destroy() depuis « ${event} » pendant la fermeture : aucun élément résiduel`, async ({ page }) => {
+      const baseline = await leaks(page);
+      const result = await page.evaluate(async (event) => {
+        const r = (window as unknown as W).URR.createReader();
+        await r.open({ type: 'text', text: 'Un deux trois quatre cinq six sept huit.' });
+        r.play();
+        r.on(event, () => r.destroy());
+        r.close();
+        return { status: r.getState().status, elements: document.querySelectorAll('urr-reader').length };
+      }, event);
+      expect(result).toEqual({ status: 'destroyed', elements: 0 });
+      expect(await leaks(page)).toEqual(baseline);
+    });
+  }
+
+  test('setSpeed() avec la vitesse stockée après une accélération terminée', async ({ page }) => {
+    test.setTimeout(30_000);
+    const state = await page.evaluate(async () => {
+      const r = (window as unknown as W).URR.createReader();
+      r.updateSettings({ acceleration: { enabled: true, startSpeed: 300, targetSpeed: 600, duration: 5 } });
+      await r.open({ type: 'text', text: Array.from({ length: 2000 }, (_, i) => `mot${i}`).join(' ') });
+      r.play();
+      await new Promise((res) => setTimeout(res, 5600));
+      const ended = r.getState();
+      const applied = r.setSpeed(250);
+      const after = r.getState();
+      r.destroy();
+      return { ended, applied, after };
+    });
+    expect(state.ended).toMatchObject({ speed: 600, accelerating: false });
+    expect(state.applied).toBe(250);
+    expect(state.after).toMatchObject({ speed: 250, accelerating: false });
+  });
+});

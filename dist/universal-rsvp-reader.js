@@ -5592,19 +5592,20 @@ var xo = class {
 	}
 	closeWith(e) {
 		if (this.phase === "closed") return;
-		let t = ++this.opSeq, n = () => t === this.opSeq, r = this.engine.getSnapshot().status === "playing", i = this.getPosition(), a = this.announced, o = this.restoreTarget, s = this.savedScroll;
-		if (this.restoreTarget = null, this.savedScroll = null, this.phase = "closed", this.announced = !1, this.title = null, this.engine.unload(), this.visibilityHandler &&= (this.element?.ownerDocument.removeEventListener("visibilitychange", this.visibilityHandler), null), $ === this && ($ = null), a && (r && i && this.emit("pause", {
+		let t = ++this.opSeq, n = () => t === this.opSeq, r = this.engine.getSnapshot().status === "playing", i = this.getPosition(), a = this.announced, o = this.restoreTarget, s = this.savedScroll, c = this.element;
+		this.restoreTarget = null, this.savedScroll = null, this.phase = "closed", this.announced = !1, this.title = null, this.engine.unload(), this.visibilityHandler &&= (this.element?.ownerDocument.removeEventListener("visibilitychange", this.visibilityHandler), null), $ === this && ($ = null), a && (r && i && this.emit("pause", {
 			...i,
 			reason: "close"
 		}), !n() || (this.emit("close", {
 			reason: e,
 			position: i
-		}), !n()))) return;
-		let c = this.element;
-		c && (c.close(), !n() || (c.remove(), !n())) || this.restoreHost(o, s, n);
+		}), !n())) || c && (c.close(), !n() || (c.remove(), !n())) || this.restoreHost(o, s, n);
 	}
 	destroy() {
-		this.destroyed || (this.destroyed = !0, this.closeWith("destroy"), this.engine.destroy(), this.element?.teardown(), this.element = null, this.events.clear());
+		if (this.destroyed) return;
+		this.destroyed = !0, this.closeWith("destroy"), this.engine.destroy();
+		let e = this.element;
+		this.element = null, e && (e.close(), e.remove(), e.teardown()), this.events.clear();
 	}
 	aborted() {
 		return this.fail(new E("ABORTED", "Ouverture interrompue par un appel plus récent (open, close ou destroy)."));
@@ -5701,7 +5702,7 @@ var xo = class {
 		}, t, r.includes("speed"));
 	}
 	commit(e, t, n) {
-		let { settings: r, changed: i } = e, a = i.includes("acceleration"), o = i.includes("speed"), s = a && r.acceleration.enabled, c = !s && (o || n && this.engine.getSnapshot().accelerating);
+		let { settings: r, changed: i } = e, a = i.includes("acceleration"), o = i.includes("speed"), s = a && r.acceleration.enabled, c = !s && (o || n);
 		return i.length === 0 ? (c && this.engine.setSpeed(r.speed), this.getSettings()) : (this.settings = r, (i.includes("timing") || a) && this.engine.configure({
 			timing: r.timing,
 			acceleration: r.acceleration,

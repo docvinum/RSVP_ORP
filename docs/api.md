@@ -173,7 +173,7 @@ reader.setPreferences(prefs);          // retourne false si les préférences so
 ```
 
 - Les règles de profil, les bornes et les coefficients sont détaillés dans [profiles-and-timing.md](profiles-and-timing.md).
-- Une vitesse fournie à `updateSettings` est un changement manuel : elle arrête l'accélération en cours, quels que soient les autres champs du patch, **y compris si elle est égale à la vitesse stockée**. Seule exception : si le même patch modifie et active l'accélération, la vitesse devient la vitesse de base et la montée repart de la vitesse de départ.
+- Une vitesse fournie à `updateSettings` est un changement manuel : elle arrête l'accélération en cours, quels que soient les autres champs du patch, **y compris si elle est égale à la vitesse stockée** ; après une accélération terminée, elle remplace la vitesse cible atteinte. Seule exception : si le même patch modifie et active l'accélération, la vitesse devient la vitesse de base et la montée repart de la vitesse de départ.
 - Les constantes exportées (`PROFILES`, `TIMING_PRESETS`, `TIMING_BOUNDS`, `LABELS_FR`…) sont gelées en profondeur.
 - Par défaut, **rien n'est écrit** dans `localStorage`. Avec `persistence.enabled`, chaque changement effectif est enregistré sous la clé configurée, au format `{ version: 1, settings }`.
 - Les préférences ne contiennent **jamais** de texte source, de contenu lu, de position ni d'historique.

@@ -28,7 +28,8 @@ Première version.
 - Ouverture transactionnelle : un nom de composant déjà pris ou un échec de `showModal()` ramènent à l'état fermé, avec une `ReaderError` et l'événement `error`.
 - Événements de focus : un `close()` depuis un gestionnaire `focusin` pendant `showModal()` annule l'ouverture ; rouvrir le lecteur depuis le focus restauré à la fermeture n'est plus défait par la fin de cette fermeture (ordre `close` puis `open`).
 - Remplacement d'un lecteur : `B.close()` appelé depuis l'événement `close` de A pendant `B.open()` annule bien l'ouverture de B.
-- Toute vitesse fournie dans un patch, même égale à la vitesse stockée, arrête l'accélération en cours (y compris combinée à des pauses).
+- Toute vitesse fournie (patch ou `setSpeed()`), même égale à la vitesse stockée, est appliquée : elle arrête l'accélération en cours et remplace la vitesse atteinte par une accélération terminée.
+- `destroy()` appelé depuis `pause` ou `close` pendant une fermeture retire bien le composant.
 - `startAt` non fini ou décimal : premier mot ou index tronqué, comme `seek()`.
 - Markdown : le HTML inline conserve les frontières de mots (`<br>`) et exclut scripts et éléments masqués.
 - Construction du modèle linéaire (une ponctuation massive prenait plusieurs secondes).
