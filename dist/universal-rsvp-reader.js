@@ -5076,7 +5076,9 @@ function Xa() {
 				class: "resume-follow",
 				hidden: !0
 			}, Q("follow"), t.resumeFollow), this.fullText = new Fa({
-				onWordActivate: (e) => this.host.activateWord(e),
+				onWordActivate: (e) => {
+					this.host.activateWord(e), this.playButton.focus({ preventScroll: !0 });
+				},
 				onFollowChange: (e) => {
 					this.resumeFollowButton.hidden = e;
 				}

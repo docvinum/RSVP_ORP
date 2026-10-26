@@ -170,7 +170,11 @@ function getElementClass(): new () => ReaderElement {
       this.resumeFollowButton = h('button', { type: 'button', class: 'resume-follow', hidden: true }, icon('follow'), L.resumeFollow);
 
       this.fullText = new FullTextView({
-        onWordActivate: (i) => this.host.activateWord(i),
+        onWordActivate: (i) => {
+          this.host.activateWord(i);
+          // Le prochain geste naturel est de (re)lancer la lecture : Espace doit agir.
+          this.playButton.focus({ preventScroll: true });
+        },
         onFollowChange: (following) => {
           this.resumeFollowButton.hidden = following;
         },

@@ -191,6 +191,7 @@ test.describe('vue du texte intégral', () => {
     await page.locator('urr-reader .fulltext .w', { hasText: 'anticonstitutionnellement' }).click();
     const s = await state(page);
     expect(s.status).toBe('paused');
+    await expect(page.getByRole('button', { name: 'Lecture', exact: true })).toBeFocused();
     await expect(page.locator('urr-reader .word')).toHaveText('anticonstitutionnellement');
     expect(s.position!.index).toBe(Number(await page.locator('urr-reader .fulltext .w.cur').getAttribute('data-w')));
   });
