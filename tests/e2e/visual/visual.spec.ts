@@ -8,6 +8,20 @@ import { gotoFixture } from '../helpers';
  */
 const TEXT = 'Lecture rapide : la lettre de fixation reste alignée. Anticonstitutionnellement, «\u{A0}voilà\u{A0}» !';
 
+/**
+ * Pour les captures pleine page, les zones de texte courant (rendu des polices
+ * propre à chaque machine) sont masquées : la mise en page reste vérifiée, et
+ * la zone ORP a ses propres captures non masquées.
+ */
+const textMasks = (page: Page) => [
+  page.locator('urr-reader header h2'),
+  page.locator('urr-reader .fulltext'),
+  page.locator('urr-reader .progress span'),
+  page.locator('urr-reader .speed output'),
+  page.locator('urr-reader .panel form'),
+  page.locator('urr-reader .settings-button-label, urr-reader header button .label'),
+];
+
 async function open(page: Page, settings: Record<string, unknown> = {}, index = 0) {
   await gotoFixture(page);
   await page.evaluate(
@@ -37,18 +51,18 @@ test('zone ORP — personnalisation (police, couleur, sans repères, sombre)', a
 
 test('modale desktop', async ({ page }) => {
   await open(page, {}, 4);
-  await expect(page).toHaveScreenshot('dialog-desktop.png');
+  await expect(page).toHaveScreenshot('dialog-desktop.png', { mask: textMasks(page) });
 });
 
 test('modale desktop avec réglages', async ({ page }) => {
   await open(page, {}, 4);
   await page.getByRole('button', { name: 'Réglages', exact: true }).click();
   await page.evaluate(() => (document.querySelector('urr-reader')!.shadowRoot!.activeElement as HTMLElement | null)?.blur());
-  await expect(page).toHaveScreenshot('dialog-desktop-settings.png');
+  await expect(page).toHaveScreenshot('dialog-desktop-settings.png', { mask: textMasks(page) });
 });
 
 test('plein écran mobile', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await open(page, {}, 4);
-  await expect(page).toHaveScreenshot('dialog-mobile.png');
+  await expect(page).toHaveScreenshot('dialog-mobile.png', { mask: textMasks(page) });
 });
