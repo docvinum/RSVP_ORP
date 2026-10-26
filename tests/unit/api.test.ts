@@ -51,6 +51,16 @@ describe('API — réglages et événements (sans DOM)', () => {
     expect(reader.getState().speed).toBe(900);
   });
 
+  it('un changement de profil applique sa vitesse au moteur', () => {
+    const reader = createReader();
+    reader.updateSettings({ profile: 'fast' });
+    expect(reader.getState().speed).toBe(400);
+    reader.updateSettings({ profile: 'comfort' });
+    expect(reader.getState().speed).toBe(200);
+    reader.resetSettings();
+    expect(reader.getState().speed).toBe(250);
+  });
+
   it('getSettings retourne une copie', () => {
     const reader = createReader();
     const s = reader.getSettings();

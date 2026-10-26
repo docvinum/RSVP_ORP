@@ -46,6 +46,19 @@ jobs:
             echo "::error::La version $VERSION ne correspond pas à package.json ($PKG)."; exit 1
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - name: Cohérence du tag
+        # « gh release create --target » ne s'applique qu'à un tag absent : un tag
+        # existant sur un autre commit recevrait les archives du commit construit.
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" > /dev/null; then
+            git fetch --no-tags --force origin "refs/tags/v$VERSION:refs/tags/v$VERSION"
+            TAG_SHA=$(git rev-parse "refs/tags/v$VERSION^{commit}")
+            if [ "$TAG_SHA" != "$GITHUB_SHA" ]; then
+              echo "::error::Le tag v$VERSION existe déjà sur $TAG_SHA, différent du commit construit ($GITHUB_SHA)."
+              exit 1
+            fi
+            echo "TAG_EXISTS=true" >> "$GITHUB_ENV"
+          fi
       - run: npm ci
       - name: Vérifications
         run: |
@@ -70,8 +83,11 @@ jobs:
           if gh release view "v$VERSION" > /dev/null 2>&1; then
             echo "::error::La release v$VERSION existe déjà."; exit 1
           fi
+          # Tag existant : déjà vérifié ci-dessus (même commit) ; --verify-tag interdit
+          # sa recréation implicite. Tag absent : créé sur le commit construit.
+          if [ "${TAG_EXISTS:-false}" = "true" ]; then TAG_ARGS=(--verify-tag); else TAG_ARGS=(--target "$GITHUB_SHA"); fi
           gh release create "v$VERSION" \
-            --target "$GITHUB_SHA" \
+            "${TAG_ARGS[@]}" \
             --title "Universal RSVP Reader v$VERSION" \
             --notes-file release/NOTES.md \
             "release/universal-rsvp-reader-$VERSION.zip" \

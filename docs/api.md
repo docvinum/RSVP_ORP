@@ -71,7 +71,8 @@ open(source: ReaderSource, options?: {
 - Elle est rejetée avec une `ReaderError` (codes `INVALID_SOURCE`, `EMPTY_CONTENT`, `PARSE_ERROR`, `ENVIRONMENT`, `DESTROYED`, `ABORTED`). L'événement `error` est émis lui aussi.
 - **Ouverture transactionnelle** : en cas d'échec (composant impossible à créer, `showModal()` refusé…), le lecteur revient à l'état fermé, sans élément monté ni document chargé, et une `ReaderError` est toujours rejetée — jamais une exception brute.
 - **Appel répété pendant l'ouverture** : la lecture en cours est mise en pause (événement `pause`, raison `api`), puis le contenu est remplacé. Le dialogue reste ouvert, le focus d'origine est conservé et `open` est émis de nouveau.
-- **Réentrance** : les événements sont synchrones et les abonnés peuvent appeler toute méthode, y compris pendant une ouverture (par exemple depuis `progress`). Un `open()`, `close()` ou `destroy()` ultérieur rend l'ouverture en cours caduque : elle est rejetée avec `ABORTED` et l'état final est celui de l'opération la plus récente. Une ouverture annulée avant d'aboutir n'émet ni `open` ni `close`.
+- **Réentrance** : les événements sont synchrones et les abonnés peuvent appeler toute méthode, y compris pendant une ouverture (par exemple depuis `progress`). Un `open()`, `close()` ou `destroy()` ultérieur rend l'ouverture en cours caduque : elle est rejetée avec `ABORTED` et l'état final est celui de l'opération la plus récente. Une ouverture annulée avant d'aboutir n'émet ni `open` ni `close`. Les appels DOM susceptibles d'exécuter du code hôte (`showModal()`, `focus()`, `dialog.close()`, qui déclenchent des événements de focus) sont traités de la même façon : un `close()` appelé depuis un gestionnaire `focusin` annule l'ouverture en cours.
+- **Ordre de fermeture** : l'état est nettoyé, puis `pause` (raison `close`) et `close` sont émis, et enfin le dialogue est retiré et le focus rendu à l'hôte. Un lecteur rouvert depuis un abonné à `close` ou depuis le focus restauré reste ouvert ; les événements suivent alors l'ordre `close` puis `open`.
 - **Instances simultanées** : une seule modale est ouverte à la fois dans la page. Ouvrir un lecteur B pendant que A est ouvert ferme A, qui émet `close` avec la raison `superseded`.
 
 ## Commandes
@@ -172,7 +173,7 @@ reader.setPreferences(prefs);          // retourne false si les préférences so
 ```
 
 - Les règles de profil, les bornes et les coefficients sont détaillés dans [profiles-and-timing.md](profiles-and-timing.md).
-- Une vitesse fournie à `updateSettings` est un changement manuel : elle arrête l'accélération en cours, quels que soient les autres champs du patch. Seule exception : si le même patch modifie et active l'accélération, la vitesse devient la vitesse de base et la montée repart de la vitesse de départ.
+- Une vitesse fournie à `updateSettings` est un changement manuel : elle arrête l'accélération en cours, quels que soient les autres champs du patch, **y compris si elle est égale à la vitesse stockée**. Seule exception : si le même patch modifie et active l'accélération, la vitesse devient la vitesse de base et la montée repart de la vitesse de départ.
 - Les constantes exportées (`PROFILES`, `TIMING_PRESETS`, `TIMING_BOUNDS`, `LABELS_FR`…) sont gelées en profondeur.
 - Par défaut, **rien n'est écrit** dans `localStorage`. Avec `persistence.enabled`, chaque changement effectif est enregistré sous la clé configurée, au format `{ version: 1, settings }`.
 - Les préférences ne contiennent **jamais** de texte source, de contenu lu, de position ni d'historique.

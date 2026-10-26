@@ -5230,7 +5230,7 @@ function oo() {
 				passive: !1,
 				capture: !0,
 				signal: r
-			}), typeof ResizeObserver == "function" && (this.resizeObserver = new ResizeObserver(() => this.align()), this.resizeObserver.observe(this.stage)), this.applySettings(n.getSettings()), this.dialog.open || this.dialog.showModal(), this.isOpen_ = !0, this.renderSnapshot(i.getSnapshot()), this.fullText.scrollToCurrent(!0), this.playButton.focus({ preventScroll: !0 });
+			}), typeof ResizeObserver == "function" && (this.resizeObserver = new ResizeObserver(() => this.align()), this.resizeObserver.observe(this.stage)), this.applySettings(n.getSettings()), this.dialog.open || this.dialog.showModal(), !r.aborted && (this.isOpen_ = !0, this.renderSnapshot(i.getSnapshot()), this.fullText.scrollToCurrent(!0), this.playButton.focus({ preventScroll: !0 }));
 		}
 		close() {
 			this.closeView(), this.dialog?.open && this.dialog.close();
@@ -5551,9 +5551,11 @@ var xo = class {
 		} catch (e) {
 			throw this.fail(yo(e, "PARSE_ERROR", "Impossible d’extraire le contenu."));
 		}
-		let i = ++this.opSeq, a = () => i !== this.opSeq || this.destroyed, o = $;
-		if ($ = this, o && o !== this && o.closeWith("superseded"), a() || $ !== this || this.phase === "open" && (this.engine.pause("api"), a())) throw this.aborted();
-		if (this.phase === "closed") {
+		let i = ++this.opSeq, a = () => i !== this.opSeq || this.destroyed, o = this.phase;
+		this.phase = "opening";
+		let s = $;
+		if ($ = this, s && s !== this && s.closeWith("superseded"), a() || $ !== this || o === "open" && (this.engine.pause("api"), a())) throw this.aborted();
+		if (o === "closed") {
 			this.restoreTarget = this.options.restoreFocus === !1 ? null : bo(n);
 			let e = n.defaultView;
 			this.savedScroll = e ? {
@@ -5561,25 +5563,25 @@ var xo = class {
 				y: e.scrollY
 			} : null;
 		}
-		this.phase = "opening";
-		let s = r.blocks.find((e) => e.kind === "heading"), c = t.title ?? (s ? r.text.slice(s.start, s.end) : this.labels.dialogTitle);
-		this.title = c;
-		let l;
+		let c = r.blocks.find((e) => e.kind === "heading"), l = t.title ?? (c ? r.text.slice(c.start, c.end) : this.labels.dialogTitle);
+		this.title = l;
+		let u;
 		try {
-			l = this.ensureElement(n);
+			u = this.ensureElement(n);
 			let e = this.options.container?.isConnected ? this.options.container : n.body;
-			l.parentNode !== e && e.append(l);
+			u.parentNode !== e && e.append(u);
 		} catch (e) {
 			throw this.closeWith("error"), this.fail(yo(e, "ENVIRONMENT", "Impossible de créer le composant du lecteur."));
 		}
 		if (this.engine.load(r, t.startAt ?? 0), a()) throw this.aborted();
 		try {
-			l.open(r, c);
+			u.open(r, l);
 		} catch (e) {
-			throw this.closeWith("error"), this.fail(yo(e, "ENVIRONMENT", "Impossible d’afficher le dialogue du lecteur."));
+			throw a() ? this.aborted() : (this.closeWith("error"), this.fail(yo(e, "ENVIRONMENT", "Impossible d’afficher le dialogue du lecteur.")));
 		}
+		if (a()) throw this.aborted();
 		this.phase = "open", this.announced = !0, this.listenVisibility(n), this.emit("open", {
-			title: c,
+			title: l,
 			wordCount: r.words.length,
 			sentenceCount: r.sentences.length,
 			sourceType: e.type
@@ -5590,19 +5592,16 @@ var xo = class {
 	}
 	closeWith(e) {
 		if (this.phase === "closed") return;
-		this.opSeq++;
-		let t = this.engine.getSnapshot().status === "playing", n = this.getPosition(), r = this.announced;
-		this.phase = "closed", this.announced = !1, this.engine.unload(), this.visibilityHandler &&= (this.element?.ownerDocument.removeEventListener("visibilitychange", this.visibilityHandler), null);
-		let i = this.element;
-		if (i && (i.close(), i.remove()), $ === this && ($ = null), this.restoreHost(), this.title = null, !r) return;
-		let a = this.opSeq;
-		t && n && this.emit("pause", {
-			...n,
+		let t = ++this.opSeq, n = () => t === this.opSeq, r = this.engine.getSnapshot().status === "playing", i = this.getPosition(), a = this.announced, o = this.restoreTarget, s = this.savedScroll;
+		if (this.restoreTarget = null, this.savedScroll = null, this.phase = "closed", this.announced = !1, this.title = null, this.engine.unload(), this.visibilityHandler &&= (this.element?.ownerDocument.removeEventListener("visibilitychange", this.visibilityHandler), null), $ === this && ($ = null), a && (r && i && this.emit("pause", {
+			...i,
 			reason: "close"
-		}), a === this.opSeq && this.emit("close", {
+		}), !n() || (this.emit("close", {
 			reason: e,
-			position: n
-		});
+			position: i
+		}), !n()))) return;
+		let c = this.element;
+		c && (c.close(), !n() || (c.remove(), !n())) || this.restoreHost(o, s, n);
 	}
 	destroy() {
 		this.destroyed || (this.destroyed = !0, this.closeWith("destroy"), this.engine.destroy(), this.element?.teardown(), this.element = null, this.events.clear());
@@ -5610,15 +5609,13 @@ var xo = class {
 	aborted() {
 		return this.fail(new E("ABORTED", "Ouverture interrompue par un appel plus récent (open, close ou destroy)."));
 	}
-	restoreHost() {
-		let e = this.restoreTarget;
-		this.restoreTarget = null;
-		let t = this.savedScroll;
-		if (this.savedScroll = null, e?.isConnected) try {
+	restoreHost(e, t, n) {
+		if (e?.isConnected) try {
 			e.focus({ preventScroll: !0 });
 		} catch {}
-		let n = this.element?.ownerDocument.defaultView ?? (typeof window < "u" ? window : null);
-		t && n && (n.scrollX !== t.x || n.scrollY !== t.y) && n.scrollTo(t.x, t.y);
+		if (!n()) return;
+		let r = this.element?.ownerDocument.defaultView ?? (typeof window < "u" ? window : null);
+		t && r && (r.scrollX !== t.x || r.scrollY !== t.y) && r.scrollTo(t.x, t.y);
 	}
 	checkEnvironment() {
 		let e = globalThis.document;
@@ -5672,7 +5669,7 @@ var xo = class {
 	applySpeed(e, t) {
 		if (this.destroyed) return this.settings.speed;
 		let n = y(e);
-		return this.engine.setSpeed(n), this.commit(oe(this.settings, { speed: n }), t, !1), n;
+		return this.commit(oe(this.settings, { speed: n }), t, !0), n;
 	}
 	getSettings() {
 		return se(this.settings);
@@ -5691,7 +5688,9 @@ var xo = class {
 		return t ? (this.replace(t, "preferences"), !0) : !1;
 	}
 	patch(e, t) {
-		return this.destroyed ? this.getSettings() : this.commit(oe(this.settings, e), t, !0);
+		if (this.destroyed) return this.getSettings();
+		let n = typeof e == "object" && !!e && e.speed !== void 0;
+		return this.commit(oe(this.settings, e), t, n);
 	}
 	replace(e, t) {
 		if (this.destroyed) return this.getSettings();
@@ -5699,22 +5698,19 @@ var xo = class {
 		return this.commit({
 			settings: n,
 			changed: r
-		}, t, !0);
+		}, t, r.includes("speed"));
 	}
 	commit(e, t, n) {
-		let { settings: r, changed: i } = e;
-		if (i.length === 0) return this.getSettings();
-		this.settings = r;
-		let a = i.includes("acceleration"), o = n && i.includes("speed"), s = a && r.acceleration.enabled;
-		return (i.includes("timing") || a) && this.engine.configure({
+		let { settings: r, changed: i } = e, a = i.includes("acceleration"), o = i.includes("speed"), s = a && r.acceleration.enabled, c = !s && (o || n && this.engine.getSnapshot().accelerating);
+		return i.length === 0 ? (c && this.engine.setSpeed(r.speed), this.getSettings()) : (this.settings = r, (i.includes("timing") || a) && this.engine.configure({
 			timing: r.timing,
 			acceleration: r.acceleration,
-			...o && s ? { speed: r.speed } : {}
-		}), o && !s && this.engine.setSpeed(r.speed), this.element?.applySettings(r), this.persist(), this.emit("settings-change", {
+			...s && (o || n) ? { speed: r.speed } : {}
+		}), c && this.engine.setSpeed(r.speed), this.element?.applySettings(r), this.persist(), this.emit("settings-change", {
 			settings: this.getSettings(),
 			changed: i,
 			source: t
-		}), this.getSettings();
+		}), this.getSettings());
 	}
 	persist() {
 		if (this.options.persistence?.enabled && this.storage) try {

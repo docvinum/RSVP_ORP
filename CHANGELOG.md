@@ -26,12 +26,15 @@ Première version.
 - Réentrance : un abonné qui met en pause, repositionne, relance ou détruit le moteur pendant une notification ne laisse plus de minuterie orpheline ni d'événement périmé.
 - Cycle de vie : rouvrir un lecteur depuis son événement `close` pendant l'ouverture d'un autre ne laisse plus deux modales ; `destroy()` ou `close()` appelés pendant une ouverture la rendent caduque (`ABORTED`) sans état partiel.
 - Ouverture transactionnelle : un nom de composant déjà pris ou un échec de `showModal()` ramènent à l'état fermé, avec une `ReaderError` et l'événement `error`.
-- Un patch combinant vitesse et pauses arrête bien l'accélération en cours.
+- Événements de focus : un `close()` depuis un gestionnaire `focusin` pendant `showModal()` annule l'ouverture ; rouvrir le lecteur depuis le focus restauré à la fermeture n'est plus défait par la fin de cette fermeture (ordre `close` puis `open`).
+- Remplacement d'un lecteur : `B.close()` appelé depuis l'événement `close` de A pendant `B.open()` annule bien l'ouverture de B.
+- Toute vitesse fournie dans un patch, même égale à la vitesse stockée, arrête l'accélération en cours (y compris combinée à des pauses).
 - `startAt` non fini ou décimal : premier mot ou index tronqué, comme `seek()`.
 - Markdown : le HTML inline conserve les frontières de mots (`<br>`) et exclut scripts et éléments masqués.
 - Construction du modèle linéaire (une ponctuation massive prenait plusieurs secondes).
 - Les segments de mots longs respectent toujours la borne de 16 lettres.
 - Constantes exportées gelées en profondeur.
 - Serveur de démonstration : écoute locale, confinement réel à la racine, réponse 400 aux URL mal encodées.
+- Workflow de publication : refuse un tag `vX.Y.Z` existant qui ne désigne pas le commit construit.
 
 [1.0.0]: https://github.com/docvinum/RSVP_ORP/releases/tag/v1.0.0

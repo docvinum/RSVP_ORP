@@ -279,3 +279,100 @@ test.describe('réentrance et ouvertures interrompues', () => {
     expect(state.after).toMatchObject({ speed: 500, accelerating: false });
   });
 });
+
+test.describe('réentrance via le focus et pendant un remplacement', () => {
+  type R = {
+    open(s: unknown, o?: unknown): Promise<void>;
+    close(): void;
+    on(t: string, f: (e: { reason?: string }) => void): () => void;
+    updateSettings(p: unknown): void;
+    play(): void;
+    getState(): { isOpen: boolean; speed: number; accelerating: boolean };
+    getDocument(): unknown;
+    isOpen: boolean;
+  };
+  type W = { URR: { createReader(o?: unknown): R }; reader: R; events: { type: string }[] };
+
+  test('close() depuis un focusin déclenché par showModal() : ouverture annulée, rien de monté', async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const w = window as unknown as W;
+      let done = false;
+      const handler = () => {
+        if (!done && document.querySelector('urr-reader')) {
+          done = true;
+          w.reader.close();
+        }
+      };
+      document.addEventListener('focusin', handler);
+      let code = 'none';
+      try {
+        await w.reader.open({ type: 'text', text: 'Un deux trois.' });
+      } catch (e) {
+        code = (e as { code: string }).code;
+      }
+      document.removeEventListener('focusin', handler);
+      return { code, triggered: done, isOpen: w.reader.isOpen, doc: w.reader.getDocument(), elements: document.querySelectorAll('urr-reader').length };
+    });
+    expect(result).toEqual({ code: 'ABORTED', triggered: true, isOpen: false, doc: null, elements: 0 });
+    await openSection(page);
+  });
+
+  test('rouvrir depuis le focus restauré à la fermeture : la nouvelle ouverture subsiste', async ({ page }) => {
+    await openSection(page, 't1');
+    await page.evaluate(() => {
+      const w = window as unknown as W;
+      const trigger = document.getElementById('t1')!;
+      const handler = () => {
+        trigger.removeEventListener('focus', handler);
+        void w.reader.open({ type: 'text', text: 'Rouvert depuis le focus.' });
+      };
+      trigger.addEventListener('focus', handler);
+    });
+    await page.keyboard.press('Escape');
+    await expect(dialog(page)).toBeVisible();
+    await expect(page.locator('urr-reader .fulltext')).toHaveText('Rouvert depuis le focus.');
+    const state = await page.evaluate(() => {
+      const w = window as unknown as W;
+      return { isOpen: w.reader.isOpen, elements: document.querySelectorAll('urr-reader').length, last: w.events.slice(-2).map((e) => e.type) };
+    });
+    expect(state).toEqual({ isOpen: true, elements: 1, last: ['close', 'open'] });
+  });
+
+  test('B.close() depuis l’événement close de A pendant B.open() : B ne s’ouvre pas', async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const w = window as unknown as W;
+      await w.reader.open({ type: 'text', text: 'Lecteur A.' });
+      const B = w.URR.createReader();
+      w.reader.on('close', () => B.close());
+      let code = 'none';
+      try {
+        await B.open({ type: 'text', text: 'Lecteur B.' });
+      } catch (e) {
+        code = (e as { code: string }).code;
+      }
+      return { code, a: w.reader.isOpen, b: B.isOpen, doc: B.getDocument(), elements: document.querySelectorAll('urr-reader').length };
+    });
+    expect(result).toEqual({ code: 'ABORTED', a: false, b: false, doc: null, elements: 0 });
+  });
+
+  test('réaffirmer la vitesse stockée arrête l’accélération', async ({ page }) => {
+    const state = await page.evaluate(async () => {
+      const w = window as unknown as W;
+      w.reader.updateSettings({ acceleration: { enabled: true, startSpeed: 300, targetSpeed: 600, duration: 60 } });
+      await w.reader.open({ type: 'text', text: Array.from({ length: 300 }, (_, i) => `mot${i}`).join(' ') });
+      w.reader.play();
+      await new Promise((r) => setTimeout(r, 300));
+      const before = w.reader.getState();
+      w.reader.updateSettings({ speed: 250, timing: { comma: 2 } });
+      const afterCombined = w.reader.getState();
+      w.reader.updateSettings({ acceleration: { duration: 90 } });
+      const rearmed = w.reader.getState().accelerating;
+      w.reader.updateSettings({ speed: 250 });
+      return { before: before.accelerating, afterCombined, rearmed, afterSpeedOnly: w.reader.getState() };
+    });
+    expect(state.before).toBe(true);
+    expect(state.afterCombined).toMatchObject({ speed: 250, accelerating: false });
+    expect(state.rearmed).toBe(true);
+    expect(state.afterSpeedOnly).toMatchObject({ speed: 250, accelerating: false });
+  });
+});
