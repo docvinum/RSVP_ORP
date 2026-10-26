@@ -1,0 +1,18 @@
+:root { font-family: system-ui, sans-serif; line-height: 1.6; color: #1c1c1c; background: #fafafa; }
+body { margin: 0; }
+app-root { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: "head head" "main side"; gap: 0 24px; }
+.site { grid-area: head; display: flex; gap: 24px; align-items: center; padding: 12px 24px; background: #1a5fb4; color: #fff; }
+.site nav { display: flex; gap: 16px; }
+.site a { color: #fff; }
+main { grid-area: main; padding: 16px 24px; max-width: 760px; }
+.lifecycle { grid-area: side; padding: 16px; border-left: 1px solid #ddd; font-size: 0.9rem; }
+article { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 8px 20px 16px; margin-bottom: 20px; }
+.format { font-size: 0.8rem; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
+button { font: inherit; padding: 8px 14px; border-radius: 6px; border: 1px solid #1a5fb4; background: #fff; color: #1a5fb4; cursor: pointer; }
+button.read { background: #1a5fb4; color: #fff; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.log { max-height: 50vh; overflow: auto; padding-left: 20px; font-family: ui-monospace, monospace; font-size: 0.8rem; }
+@media (max-width: 800px) {
+  app-root { grid-template-columns: 1fr; grid-template-areas: "head" "main" "side"; }
+  .lifecycle { border-left: 0; border-top: 1px solid #ddd; }
+}

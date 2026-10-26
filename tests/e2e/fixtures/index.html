@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fixture E2E — Universal RSVP Reader</title>
+  <style>
+    body { font-family: sans-serif; margin: 0 auto; max-width: 720px; padding: 16px; }
+    section { margin-bottom: 1200px; }
+  </style>
+</head>
+<body>
+  <section id="s1" lang="fr">
+    <h2>Première section</h2>
+    <p>Bonjour, voici un texte de démonstration. Il contient plusieurs phrases ; certaines sont longues, d’autres non !</p>
+    <p>Un second paragraphe avec un mot anticonstitutionnellement long et des nombres comme 1 000 ou 3,14.</p>
+    <button id="t1" type="button">Lecture rapide</button>
+  </section>
+  <section id="s2" lang="en">
+    <h2>Second section</h2>
+    <p>The quick brown fox jumps over the lazy dog. Mr. Smith reads fast.</p>
+    <button id="t2" type="button">Lecture rapide</button>
+  </section>
+  <script type="module">
+    import * as URR from '/dist/universal-rsvp-reader.js';
+    window.URR = URR;
+    window.reader = URR.createReader();
+    window.events = [];
+    for (const type of ['open', 'play', 'pause', 'complete', 'close', 'error', 'settings-change']) {
+      window.reader.on(type, (e) => window.events.push({ type, e }));
+    }
+    document.getElementById('t1').addEventListener('click', () => window.reader.open({ type: 'dom', element: document.getElementById('s1') }));
+    document.getElementById('t2').addEventListener('click', () => window.reader.open({ type: 'dom', element: document.getElementById('s2') }));
+    window.ready = true;
+  </script>
+</body>
+</html>
