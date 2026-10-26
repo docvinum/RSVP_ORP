@@ -1,0 +1,18 @@
+# Universal RSVP Reader
+
+> Bibliothèque TypeScript autonome de lecture rapide RSVP avec ORP : Web Component <urr-reader> (Shadow DOM) et API createReader(), pour Vue 3, Angular et JavaScript natif. Livrée sous forme d'artefact ESM copié (dist/), sans npm, sans réseau, sans style global. Documentation en français.
+
+## Pour les agents qui modifient ce dépôt
+- [AGENTS.md](AGENTS.md): commandes, architecture, invariants, règles de produit, recettes, définition de « terminé »
+
+## Pour les agents qui intègrent la bibliothèque
+- [Intégration par un agent IA](docs/ai-integration.md): procédure prescriptive Vue, Angular, JavaScript natif, liste de vérification et tests
+- [API publique](docs/api.md): options, sources, méthodes, états, événements, erreurs, préférences
+
+## Référence
+- [Profils et timing](docs/profiles-and-timing.md): vitesses, coefficients, accélération, algorithme ORP
+- [Guide UX et clavier](docs/ux-keyboard.md): dispositions, raccourcis, accessibilité
+- [Architecture](docs/architecture.md): modules, flux, décisions
+- [Mise à jour locale](docs/local-update.md): copie et vérification de dist/
+- [Limitations](docs/limitations.md)
+- [Changelog](CHANGELOG.md)

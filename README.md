@@ -89,6 +89,8 @@ Le lecteur crée lui-même son élément `<urr-reader>` : aucun `CUSTOM_ELEMENTS
 | [docs/local-update.md](docs/local-update.md) | Mise à jour des artefacts copiés |
 | [docs/limitations.md](docs/limitations.md) | Limitations connues |
 | [CHANGELOG.md](CHANGELOG.md) | Historique des versions |
+| [AGENTS.md](AGENTS.md) | Guide pour agents IA de coding qui modifient ce dépôt |
+| [docs/ai-integration.md](docs/ai-integration.md) | Guide pour agents IA qui intègrent la bibliothèque dans une application |
 
 ## Démonstrateurs
 
