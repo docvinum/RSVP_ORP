@@ -360,7 +360,6 @@ function getElementClass(): new () => ReaderElement {
         const position = L.wordPosition(s.index + 1, s.total);
         this.range.setAttribute('aria-valuetext', position);
         this.positionText.textContent = `${s.index + 1} / ${s.total}`;
-        this.range.style.setProperty('--p', String(s.progress));
       }
       this.renderRemaining(s);
       if (s.status !== this.lastStatus) {

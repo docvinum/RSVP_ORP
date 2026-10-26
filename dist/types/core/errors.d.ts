@@ -5,10 +5,10 @@
  * - `PARSE_ERROR` : échec inattendu de l'extraction ;
  * - `ENVIRONMENT` : API navigateur requise indisponible (DOMParser, customElements…) ;
  * - `DESTROYED` : appel d'`open()` sur un lecteur détruit ;
- * - `ABORTED` : `open()` remplacé par un appel plus récent ou par `close()` ;
- * - `STORAGE` : lecture/écriture des préférences impossible (non bloquant).
+ * - `STORAGE` : lecture/écriture des préférences impossible (non bloquant) ;
+ * - `LISTENER` : un abonné aux événements a levé une exception (non bloquant).
  */
-export type ReaderErrorCode = 'INVALID_SOURCE' | 'EMPTY_CONTENT' | 'PARSE_ERROR' | 'ENVIRONMENT' | 'DESTROYED' | 'ABORTED' | 'STORAGE';
+export type ReaderErrorCode = 'INVALID_SOURCE' | 'EMPTY_CONTENT' | 'PARSE_ERROR' | 'ENVIRONMENT' | 'DESTROYED' | 'STORAGE' | 'LISTENER';
 export declare class ReaderError extends Error {
     readonly code: ReaderErrorCode;
     /** `false` si la lecture peut continuer (ex. : erreur de stockage). */

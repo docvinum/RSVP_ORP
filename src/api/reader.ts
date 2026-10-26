@@ -266,7 +266,7 @@ class ReaderImpl implements Reader {
   private emit<K extends ReaderEventType>(type: K, payload: ReaderEventMap[K]): void {
     this.events.emit(type, payload, (error) => {
       // Une erreur d'abonné ne doit pas interrompre la lecture.
-      if (type !== 'error') this.emit('error', { error: new ReaderError('PARSE_ERROR', 'Erreur dans un abonné aux événements.', { cause: error, fatal: false }) });
+      if (type !== 'error') this.emit('error', { error: new ReaderError('LISTENER', `Erreur dans un abonné à « ${type} ».`, { cause: error }) });
     });
   }
 
@@ -288,6 +288,8 @@ class ReaderImpl implements Reader {
     // eslint-disable-next-line @typescript-eslint/no-this-alias -- registre module des lecteurs ouverts
     activeReader = this;
 
+    // Réouverture pendant la lecture : la lecture en cours est d'abord suspendue (événement pause).
+    if (this.open_) this.engine.pause('api');
     if (!this.open_) {
       this.restoreTarget = this.options.restoreFocus === false ? null : deepActiveElement(doc);
       const view = doc.defaultView;

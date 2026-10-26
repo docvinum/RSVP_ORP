@@ -5,8 +5,8 @@
  * - `PARSE_ERROR` : échec inattendu de l'extraction ;
  * - `ENVIRONMENT` : API navigateur requise indisponible (DOMParser, customElements…) ;
  * - `DESTROYED` : appel d'`open()` sur un lecteur détruit ;
- * - `ABORTED` : `open()` remplacé par un appel plus récent ou par `close()` ;
- * - `STORAGE` : lecture/écriture des préférences impossible (non bloquant).
+ * - `STORAGE` : lecture/écriture des préférences impossible (non bloquant) ;
+ * - `LISTENER` : un abonné aux événements a levé une exception (non bloquant).
  */
 export type ReaderErrorCode =
   | 'INVALID_SOURCE'
@@ -14,8 +14,8 @@ export type ReaderErrorCode =
   | 'PARSE_ERROR'
   | 'ENVIRONMENT'
   | 'DESTROYED'
-  | 'ABORTED'
-  | 'STORAGE';
+  | 'STORAGE'
+  | 'LISTENER';
 
 export class ReaderError extends Error {
   readonly code: ReaderErrorCode;
@@ -26,7 +26,7 @@ export class ReaderError extends Error {
     super(message, options.cause !== undefined ? { cause: options.cause } : undefined);
     this.name = 'ReaderError';
     this.code = code;
-    this.fatal = options.fatal ?? code !== 'STORAGE';
+    this.fatal = options.fatal ?? (code !== 'STORAGE' && code !== 'LISTENER');
   }
 }
 

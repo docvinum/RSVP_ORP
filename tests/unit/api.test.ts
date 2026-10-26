@@ -142,3 +142,19 @@ describe('API — préférences', () => {
     expect(parsePreferences({ version: 1, settings: { speed: 5, appearance: { fontSize: 1000 } } })).toMatchObject({ speed: 150, appearance: { fontSize: 96 } });
   });
 });
+
+describe('API — robustesse des abonnés', () => {
+  it('une exception dans un abonné est isolée et signalée (LISTENER, non bloquante)', () => {
+    const reader = createReader();
+    const errors: ReaderError[] = [];
+    reader.on('error', ({ error }) => errors.push(error));
+    reader.on('settings-change', () => {
+      throw new Error('bug hôte');
+    });
+    const after = vi.fn();
+    reader.on('settings-change', after);
+    expect(() => reader.setSpeed(300)).not.toThrow();
+    expect(after).toHaveBeenCalledTimes(1);
+    expect(errors[0]).toMatchObject({ code: 'LISTENER', fatal: false });
+  });
+});

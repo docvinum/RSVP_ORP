@@ -549,7 +549,7 @@ var me = { now: () => typeof performance < "u" && typeof performance.now == "fun
 	code;
 	fatal;
 	constructor(e, t, n = {}) {
-		super(t, n.cause === void 0 ? void 0 : { cause: n.cause }), this.name = "ReaderError", this.code = e, this.fatal = n.fatal ?? e !== "STORAGE";
+		super(t, n.cause === void 0 ? void 0 : { cause: n.cause }), this.name = "ReaderError", this.code = e, this.fatal = n.fatal ?? (e !== "STORAGE" && e !== "LISTENER");
 	}
 };
 function _e(e) {
@@ -5165,7 +5165,7 @@ function Xa() {
 				let r = n.currentWord(), i = Aa(r?.text ?? "", this.segmenter);
 				this.beforeEl.textContent = i.before, this.pivotEl.textContent = i.pivot, this.afterEl.textContent = r?.continues && !/[-‐/_.]$/u.test(r.text) ? `${i.after}‐` : i.after, this.align(), this.fullText.highlight(e.index, e.sentenceIndex), this.range.value = String(Math.max(0, e.index));
 				let a = t.wordPosition(e.index + 1, e.total);
-				this.range.setAttribute("aria-valuetext", a), this.positionText.textContent = `${e.index + 1} / ${e.total}`, this.range.style.setProperty("--p", String(e.progress));
+				this.range.setAttribute("aria-valuetext", a), this.positionText.textContent = `${e.index + 1} / ${e.total}`;
 			}
 			if (this.renderRemaining(e), e.status !== this.lastStatus) {
 				let n = this.lastStatus;
@@ -5428,10 +5428,7 @@ var lo = class {
 	}
 	emit(e, t) {
 		this.events.emit(e, t, (t) => {
-			e !== "error" && this.emit("error", { error: new E("PARSE_ERROR", "Erreur dans un abonné aux événements.", {
-				cause: t,
-				fatal: !1
-			}) });
+			e !== "error" && this.emit("error", { error: new E("LISTENER", `Erreur dans un abonné à « ${e} ».`, { cause: t }) });
 		});
 	}
 	async open(e, t = {}) {
@@ -5446,7 +5443,7 @@ var lo = class {
 		} catch (e) {
 			throw this.fail(e instanceof E ? e : new E("PARSE_ERROR", "Impossible d’extraire le contenu.", { cause: e }));
 		}
-		if ($ && $ !== this && $.closeWith("superseded"), $ = this, !this.open_) {
+		if ($ && $ !== this && $.closeWith("superseded"), $ = this, this.open_ && this.engine.pause("api"), !this.open_) {
 			this.restoreTarget = this.options.restoreFocus === !1 ? null : co(n);
 			let e = n.defaultView;
 			this.savedScroll = e ? {

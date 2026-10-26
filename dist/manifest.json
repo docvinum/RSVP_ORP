@@ -11,7 +11,7 @@
     "types/core/document.d.ts": "595cafd0e3b6ea1da680406e7b26582a2c4de2fddf7d03f7a636721b694453ce",
     "types/core/emitter.d.ts": "f137e6e99671337f8cb21fcbbd6f185a6f8505cd40ecf4d1ca0143ff5d75b084",
     "types/core/engine.d.ts": "58522a8d55bd158d511db744c76d242a7f77498eb232279b84e0c30ff2991bad",
-    "types/core/errors.d.ts": "d39100b3ceb873557a83a40a392873d9f04e01415f2a5f144b72839f352897d0",
+    "types/core/errors.d.ts": "fee4e020ba502ca6af7355b90d42042ef26be6fad03adb77ca9c37f7d3b91533",
     "types/core/model.d.ts": "bc8e52bd9b3cf1ea968fdb0e37231c9bb4db26e4f1a834912686da9f22f9d6cb",
     "types/core/normalize.d.ts": "dfff4bee2f5b43d1fc16d0a983198a80a497d88eed3610a5f58681f79c175f51",
     "types/core/orp.d.ts": "d430da285cfd8743c9c3c9db9fd5840730a98de2d9ce17412d6f319b9b4cf716",
@@ -32,7 +32,7 @@
     "types/ui/settings-panel.d.ts": "caec4d3872fe9c3b03f7ce34e5246a2bf2ac3a13044a05c70b818bfbe34e1614",
     "types/ui/styles.d.ts": "e1111079fa03c77e4bcc1d04bd1a786ee7368f1e0ffc727d1a67c365f21290e3",
     "universal-rsvp-reader.d.ts": "d26bd3da6fd4f87848a3d9fe100024c43f715b51d0d7c9438a091748f0356d2c",
-    "universal-rsvp-reader.js": "c1019951d9be17957824b8523359d39ae4248d7724eb9a0729e7c788eb18a2d8",
-    "universal-rsvp-reader.js.map": "6654daac7feebd375506e84f532e760f40e2bb140a5ca64e04ff00a5e6e87ae1"
+    "universal-rsvp-reader.js": "c749f0e837f44c17db8c449972c884bb158baa68067be657efad4ccee29da872",
+    "universal-rsvp-reader.js.map": "b2125e61ed349eb0f0c341873f20b2086070483b3f097942b177c57edf061f99"
   }
 }
