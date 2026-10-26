@@ -2,6 +2,11 @@
 
 Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Versionnage : [SemVer](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Ajouté
+- Documentation pour agents IA de coding : `AGENTS.md` (contribution au dépôt), `CLAUDE.md`, `docs/ai-integration.md` (intégration dans une application hôte) et `llms.txt`.
+
 ## [1.0.0] — 2026-10-26
 
 Première version.
