@@ -43,7 +43,7 @@ test.describe('ouverture et contenu', () => {
     await page.evaluate(() => (window as unknown as { reader: { open(s: unknown): Promise<void> } }).reader.open({ type: 'text', text: 'Texte brut.\n\nSecond paragraphe.' }));
     await expect(page.locator('urr-reader .fulltext p')).toHaveCount(2);
     expect(await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned)).toBeUndefined();
-    expect(requests.filter((u) => !u.startsWith('http://localhost'))).toEqual([]);
+    expect(requests.filter((u) => new URL(u).hostname !== '127.0.0.1')).toEqual([]);
   });
 
   test('rejette une source vide avec une erreur typée', async ({ page }) => {

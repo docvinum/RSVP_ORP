@@ -15,7 +15,7 @@ src/
 │   ├── emitter.ts        Émetteur typé
 │   ├── color.ts          Contraste WCAG
 │   └── errors.ts         ReaderError
-├── parsers/   Extraction : texte, HTML (DOMParser inerte), Markdown (markdown-it), DOM (lecture seule)
+├── parsers/   Extraction : texte, HTML (DOMParser, jamais inséré), Markdown (markdown-it), DOM (lecture seule)
 ├── ui/        Web Component <urr-reader> (Shadow DOM), vue intégrale, panneau de réglages, styles
 ├── api/       Façade createReader(), événements publics, préférences
 └── index.ts   Exports publics
@@ -46,7 +46,9 @@ createReader() ──▶ ReaderImpl ──possède──▶ RsvpEngine (unique) 
 | Instances simultanées | Une seule modale ouverte (la précédente est fermée avec `superseded`) | Deux dialogues modaux concurrents ne sont pas accessibles |
 | Onglet masqué | Pause automatique, sans reprise automatique | Évite de « lire » dans le vide et de surprendre l'utilisateur au retour |
 | Markdown | markdown-it embarqué, modèle construit depuis les tokens, jamais rendu | Parseur mature ; pas de HTML intermédiaire, donc pas de risque d'injection |
-| HTML | DOMParser (document sans contexte de navigation) | Aucun script exécuté, aucune ressource chargée |
+| HTML | DOMParser (document sans contexte de navigation) | Aucun script exécuté ; pas de chargement de ressources dans les navigateurs actuels (non garanti par la spécification) ; HTML inline du Markdown traité avec les mêmes exclusions |
+| Réentrance | État complet avant notification ; numéro d'opération pour `open` ; `ABORTED` pour une ouverture caduque | Événements synchrones (contrat public inchangé) tout en tolérant tout appel depuis un abonné |
+| Ouverture | Transactionnelle (retour à l'état fermé en cas d'échec) | Pas d'élément monté ni de document chargé après un échec |
 | Rendu du texte intégral | Nœuds texte uniquement, depuis le modèle | Aucun HTML source réinjecté |
 | Styles | Shadow DOM, `adoptedStyleSheets`, `:host { all: initial }` | Aucun style global ; insensible aux styles de l'hôte |
 | Défilement de l'hôte | Molette et toucher bloqués hors des zones défilantes du lecteur pendant l'ouverture, position restaurée à la fermeture | Préserve la position de lecture dans la page |

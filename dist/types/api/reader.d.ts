@@ -60,7 +60,7 @@ export interface ReaderPosition {
     speed: number;
 }
 export type ReaderStatus = 'closed' | 'ready' | 'playing' | 'paused' | 'complete' | 'destroyed';
-export type CloseReason = 'user' | 'api' | 'superseded' | 'destroy' | 'detached';
+export type CloseReason = 'user' | 'api' | 'superseded' | 'destroy' | 'detached' | 'error';
 export type SettingsChangeSource = 'user' | 'api' | 'preferences';
 export interface ReaderState {
     status: ReaderStatus;

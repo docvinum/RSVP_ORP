@@ -139,11 +139,58 @@ describe('mots très longs', () => {
     expect(doc.words[1]!.punctuation).toBe('none');
   });
 
-  it('préfère les frontières de tokens (traits d’union) et respecte maxWordLength', () => {
+  it('garantit au plus 16 lettres par segment, même quand un token dépasse cette taille', () => {
     const doc = buildDocument([{ kind: 'paragraph', text: 'internationalisation-supercalifragilistic.' }]);
-    expect(doc.words.map((w) => w.text)).toEqual(['internationalisation-', 'supercalifragilistic.']);
+    expect(doc.words.map((w) => w.text)).toEqual(['internatio', 'nalisation-', 'supercalif', 'ragilistic.']);
+    expect(doc.words.every((w) => w.letterCount <= 16)).toBe(true);
+    expect(doc.words.map((w) => w.continues)).toEqual([true, true, true, false]);
+    expect(doc.words[3]!.punctuation).toBe('sentence');
     const short = buildDocument([{ kind: 'paragraph', text: 'anticonstitutionnellement' }], { maxWordLength: 12 });
     expect(short.words.length).toBe(2);
+  });
+
+  it.each(['intl', 'fallback'] as const)('invariants des segments sur des mots variés (%s)', (segmentation) => {
+    const samples = [
+      'a'.repeat(26),
+      'é'.repeat(40),
+      'e\u{301}'.repeat(30),
+      'abc-'.repeat(12) + 'fin',
+      'l’' + 'x'.repeat(60) + '!',
+      '123456789'.repeat(5),
+      'Rindfleischetikettierungsüberwachungsaufgabenübertragungsgesetz',
+    ];
+    for (const sample of samples) {
+      const doc = buildDocument([{ kind: 'paragraph', text: `Début ${sample} fin.` }], { segmentation });
+      for (const w of doc.words) {
+        expect(w.letterCount, w.text).toBeLessThanOrEqual(25);
+        if (w.continues || doc.words[w.index - 1]?.continues) expect(w.letterCount, w.text).toBeLessThanOrEqual(16);
+        expect(doc.text.slice(w.start, w.end)).toBe(w.text);
+      }
+      // Les segments recouvrent exactement le mot d'origine.
+      const joined = doc.words.slice(1, -1).map((w) => w.text).join('');
+      expect(joined).toBe(doc.text.slice(doc.words[1]!.start, doc.words[doc.words.length - 2]!.end));
+      doc.tokens.forEach((t, i) => expect(t.index).toBe(i));
+    }
+  });
+});
+
+describe('performance', () => {
+  it.each(['intl', 'fallback'] as const)('reste linéaire sur une ponctuation massive (%s)', (segmentation) => {
+    // 64 000 groupes de ponctuation (128 000 caractères) : ~12,8 s avant correction.
+    const text = Array.from({ length: 64_000 }, () => '! ').join('') + 'fin';
+    const t0 = performance.now();
+    const doc = buildDocument([{ kind: 'paragraph', text }], { segmentation });
+    expect(performance.now() - t0).toBeLessThan(3000);
+    expect(doc.words).toHaveLength(1);
+  });
+
+  it('traite un long document ordinaire rapidement', () => {
+    const para = 'Un paragraphe ordinaire, avec de la ponctuation ; des « guillemets » et 1 000 mots. ';
+    const text = Array.from({ length: 2000 }, () => para).join('\n\n');
+    const t0 = performance.now();
+    const doc = buildDocument(text.split('\n\n').map((t) => ({ kind: 'paragraph' as const, text: t })));
+    expect(performance.now() - t0).toBeLessThan(3000);
+    expect(doc.words.length).toBeGreaterThan(20_000);
   });
 });
 

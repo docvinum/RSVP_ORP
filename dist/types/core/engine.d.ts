@@ -69,6 +69,11 @@ export interface EngineOptions extends Partial<EngineConfig> {
 /**
  * Moteur RSVP indépendant du DOM. Une instance par lecteur.
  *
+ * Réentrance : l'état (index, statut, minuterie) est entièrement mis à jour
+ * avant toute notification. Un abonné peut donc appeler n'importe quelle
+ * méthode (pause, seek, destroy…) depuis un événement sans laisser de
+ * minuterie orpheline ni d'état incohérent.
+ *
  * Planification : chaque mot a une échéance `affichage + durée`. Les mots
  * suivants sont planifiés à partir de l'échéance précédente (compensation de
  * dérive). Si la minuterie se réveille avec plus de `maxLagMs` de retard, la
@@ -94,7 +99,11 @@ export declare class RsvpEngine {
     private destroyed;
     constructor(options?: EngineOptions);
     on<K extends keyof EngineEvents>(type: K, listener: Listener<EngineEvents[K]>): Unsubscribe;
-    /** Charge un document ; la lecture est en pause (`ready`) au mot `startIndex`. */
+    /**
+     * Charge un document ; la lecture est en pause (`ready`) au mot
+     * `startIndex`, tronqué et borné comme pour `seek()` (une valeur non finie
+     * vaut 0).
+     */
     load(doc: NormalizedDocument, startIndex?: number): void;
     unload(): void;
     getDocument(): NormalizedDocument | null;
@@ -137,6 +146,8 @@ export declare class RsvpEngine {
     /** Arrête toute activité et libère les abonnés. Idempotent. */
     destroy(): void;
     get isDestroyed(): boolean;
+    /** Statut relu après une notification (non rétréci par TypeScript). */
+    private currentStatus;
     private clampIndex;
     private setStatus;
     private emitPosition;
@@ -151,5 +162,6 @@ export declare class RsvpEngine {
     private resetRamp;
     private rampElapsedNow;
     private accumulateRamp;
+    /** Termine la montée si sa durée est écoulée ; retourne vrai si elle vient de se terminer. */
     private updateRampCompletion;
 }

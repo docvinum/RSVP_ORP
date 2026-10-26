@@ -4,6 +4,10 @@ La bibliothèque n'est pas publiée sur npm. Les applications hôtes embarquent 
 
 ## Procédure
 
+**Option rapide** : téléchargez l'archive `universal-rsvp-reader-<version>.zip` jointe à la [release GitHub](https://github.com/docvinum/RSVP_ORP/releases), vérifiez-la avec `SHA256SUMS.txt`, puis passez directement à l'étape 2 en remplaçant le dossier copié par le contenu de l'archive.
+
+**Depuis les sources** :
+
 1. Dans ce dépôt, à la version voulue (tag ou branche) :
 
    ```bash

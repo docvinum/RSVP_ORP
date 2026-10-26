@@ -110,3 +110,20 @@ describe('validation', () => {
     expect(normalizeColor('rgb(0,0,0)')).toBe('#d32f2f');
   });
 });
+
+describe('constantes exportées', () => {
+  it('sont gelées en profondeur (bornes, profils, niveaux, libellés)', async () => {
+    const { TIMING_BOUNDS, TIMING_PRESETS, PROFILES } = await import('../../src/core/settings');
+    const { LABELS_FR } = await import('../../src/ui/labels');
+    expect(() => {
+      (TIMING_BOUNDS.comma as { max: number }).max = 9999;
+    }).toThrow(TypeError);
+    expect(TIMING_BOUNDS.comma.max).toBe(4);
+    expect(normalizeSettings({ profile: 'custom', timing: { comma: 9999 } }).timing.comma).toBe(4);
+    expect(Object.isFrozen(TIMING_PRESETS.normal) && Object.isFrozen(PROFILES.fast)).toBe(true);
+    expect(() => {
+      (LABELS_FR.profiles as { comfort: string }).comfort = 'x';
+    }).toThrow(TypeError);
+    expect(Object.isFrozen(LABELS_FR.shortcutList[0])).toBe(true);
+  });
+});

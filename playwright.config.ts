@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const PORT = Number(process.env.PORT ?? 4173);
+const HOST = '127.0.0.1';
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -9,7 +10,7 @@ export default defineConfig({
   retries: 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
-    baseURL: `http://localhost:${PORT}`,
+    baseURL: `http://${HOST}:${PORT}`,
     trace: 'retain-on-failure',
   },
   expect: {
@@ -40,7 +41,7 @@ export default defineConfig({
   ],
   webServer: {
     command: `node scripts/serve.mjs`,
-    url: `http://localhost:${PORT}/dist/manifest.json`,
+    url: `http://${HOST}:${PORT}/dist/manifest.json`,
     reuseExistingServer: !process.env.CI,
     env: { PORT: String(PORT) },
   },

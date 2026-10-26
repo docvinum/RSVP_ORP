@@ -274,13 +274,20 @@ function getElementClass(): new () => ReaderElement {
 
       this.applySettings(host.getSettings());
       if (!this.dialog.open) this.dialog.showModal();
+      // showModal() déplace le focus : un gestionnaire focusin de l'hôte a pu
+      // fermer le lecteur entre-temps (signal abandonné par closeView()).
+      if (signal.aborted) return;
       this.isOpen_ = true;
       this.renderSnapshot(engine.getSnapshot());
       this.fullText.scrollToCurrent(true);
       this.playButton.focus({ preventScroll: true });
     }
 
-    /** Ferme le dialogue et libère les abonnements et observateurs. Idempotent. */
+    /**
+     * Ferme le dialogue et libère les abonnements et observateurs. Idempotent.
+     * `dialog.close()` peut rendre nativement le focus à l'élément d'origine,
+     * donc exécuter du code hôte : l'appelant doit le traiter comme tel.
+     */
     close(): void {
       this.closeView();
       if (this.dialog?.open) this.dialog.close();

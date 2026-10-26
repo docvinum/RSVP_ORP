@@ -1,0 +1,95 @@
+name: Release
+
+# Publie une release GitHub avec l'artefact dist/ archivé.
+# - Déclenchement manuel (Actions → Release → Run workflow) : crée le tag v<version> sur le commit courant de main.
+# - Ou en poussant un tag v<version> existant.
+# La version doit correspondre à package.json et avoir une section dans CHANGELOG.md.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version à publier, sans le « v » (ex. 1.0.0)'
+        required: true
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then VERSION="$INPUT_VERSION"; else VERSION="${REF_NAME#v}"; fi
+          VERSION="${VERSION#v}"
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Version invalide : $VERSION"; exit 1
+          fi
+          PKG=$(node -p "require('./package.json').version")
+          if [ "$VERSION" != "$PKG" ]; then
+            echo "::error::La version $VERSION ne correspond pas à package.json ($PKG)."; exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - name: Cohérence du tag
+        # « gh release create --target » ne s'applique qu'à un tag absent : un tag
+        # existant sur un autre commit recevrait les archives du commit construit.
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" > /dev/null; then
+            git fetch --no-tags --force origin "refs/tags/v$VERSION:refs/tags/v$VERSION"
+            TAG_SHA=$(git rev-parse "refs/tags/v$VERSION^{commit}")
+            if [ "$TAG_SHA" != "$GITHUB_SHA" ]; then
+              echo "::error::Le tag v$VERSION existe déjà sur $TAG_SHA, différent du commit construit ($GITHUB_SHA)."
+              exit 1
+            fi
+            echo "TAG_EXISTS=true" >> "$GITHUB_ENV"
+          fi
+      - run: npm ci
+      - name: Vérifications
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+      - name: Build reproductible
+        run: |
+          npm run build
+          git diff --exit-code -- dist || (echo "::error::dist/ commité n'est pas à jour." && exit 1)
+          node scripts/verify-copy.mjs dist
+      - name: Archives et notes
+        run: |
+          NAME="universal-rsvp-reader-$VERSION"
+          mkdir -p release && cp -R dist "release/$NAME"
+          (cd release && zip -qr "$NAME.zip" "$NAME" && tar -czf "$NAME.tar.gz" "$NAME" && sha256sum "$NAME.zip" "$NAME.tar.gz" > SHA256SUMS.txt)
+          node scripts/release-notes.mjs "$VERSION" > release/NOTES.md
+      - name: Publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v$VERSION" > /dev/null 2>&1; then
+            echo "::error::La release v$VERSION existe déjà."; exit 1
+          fi
+          # Tag existant : déjà vérifié ci-dessus (même commit) ; --verify-tag interdit
+          # sa recréation implicite. Tag absent : créé sur le commit construit.
+          if [ "${TAG_EXISTS:-false}" = "true" ]; then TAG_ARGS=(--verify-tag); else TAG_ARGS=(--target "$GITHUB_SHA"); fi
+          gh release create "v$VERSION" \
+            "${TAG_ARGS[@]}" \
+            --title "Universal RSVP Reader v$VERSION" \
+            --notes-file release/NOTES.md \
+            "release/universal-rsvp-reader-$VERSION.zip" \
+            "release/universal-rsvp-reader-$VERSION.tar.gz" \
+            release/SHA256SUMS.txt
