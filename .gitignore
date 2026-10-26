@@ -1,0 +1,10 @@
+node_modules/
+test-results/
+playwright-report/
+blob-report/
+coverage/
+examples/*/vendor/
+examples/*/dist/
+examples/angular/.angular/
+*.log
+.DS_Store

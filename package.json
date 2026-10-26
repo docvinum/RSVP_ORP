@@ -1,0 +1,54 @@
+{
+  "name": "universal-rsvp-reader",
+  "version": "1.0.0",
+  "description": "Lecteur RSVP/ORP autonome (Web Component + API JavaScript) pour applications Vue 3, Angular et JavaScript natif.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "module": "./dist/universal-rsvp-reader.js",
+  "types": "./dist/universal-rsvp-reader.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/universal-rsvp-reader.d.ts",
+      "import": "./dist/universal-rsvp-reader.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "node scripts/build.mjs",
+    "sync:examples": "node scripts/sync-examples.mjs",
+    "examples:install": "npm --prefix examples/vue install && npm --prefix examples/angular install",
+    "examples:build": "npm run sync:examples && npm --prefix examples/vue run build && npm --prefix examples/angular run build",
+    "serve": "node scripts/serve.mjs",
+    "test:e2e": "playwright test --project=desktop --project=mobile --project=integration",
+    "test:visual": "playwright test --project=visual",
+    "test:visual:update": "playwright test --project=visual --update-snapshots",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build"
+  },
+  "dependencies": {
+    "markdown-it": "^15.0.3"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
+    "@types/markdown-it": "^14.2.0",
+    "@types/node": "^22.20.5",
+    "eslint": "^10.13.0",
+    "jsdom": "^29.1.1",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.72.0",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}
